@@ -263,6 +263,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
     <div class="header-inner">
       <h1>My English App</h1>
       <div class="header-actions">
+        <span id="header-sync-dot" title="Statut sync" style="width:8px;height:8px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:2px;"></span>
         <button class="icon-btn" onclick="openSettings()" title="Paramètres & sync">⚙️</button>
       </div>
     </div>
@@ -494,27 +495,55 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
     <div class="modal-handle"></div>
     <div class="modal-title">Paramètres & Synchronisation</div>
 
+    <!-- SUPABASE SYNC -->
     <div class="modal-section">
-      <h3>Exporter mes données</h3>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Sauvegardez tout votre dico, vos phrases et ajouts personnels dans un fichier JSON. Importez-le sur un autre appareil pour synchroniser.</p>
-      <div class="modal-row">
-        <div>
-          <div class="modal-label">Exporter tout</div>
-          <div class="modal-sublabel">Dico + phrases + ajouts personnels</div>
-        </div>
-        <button class="modal-btn" onclick="exportData()">📤 Exporter</button>
+      <h3>☁️ Synchronisation automatique</h3>
+      <div id="sync-status-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;"></span>
+        <span id="sync-status-text" style="font-size:13px;color:var(--text2);">Non configuré</span>
+        <span id="sync-last" style="font-size:11px;color:var(--text3);margin-left:auto;"></span>
       </div>
-      <div class="modal-row">
-        <div>
-          <div class="modal-label">Importer</div>
-          <div class="modal-sublabel">Charger un fichier exporté</div>
+      <div id="supabase-config-wrap">
+        <div class="form-field" style="margin-bottom:8px;">
+          <input id="sb-url" placeholder="Project URL  (https://xxxx.supabase.co)" style="width:100%;padding:9px 12px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--text);font-family:inherit;outline:none;">
         </div>
-        <button class="modal-btn" onclick="document.getElementById('import-file').click()">📥 Importer</button>
+        <div class="form-field" style="margin-bottom:10px;">
+          <input id="sb-key" placeholder="Anon public key" type="password" style="width:100%;padding:9px 12px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--text);font-family:inherit;outline:none;">
+        </div>
+        <button class="btn-primary" onclick="saveSupabaseConfig()" style="width:100%;">Connecter Supabase</button>
+        <details style="margin-top:12px;">
+          <summary style="font-size:12px;color:var(--text3);cursor:pointer;">Comment configurer Supabase ?</summary>
+          <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-top:8px;padding:10px;background:var(--surface2);border-radius:var(--radius);">
+            <strong>1.</strong> Allez sur <a href="https://supabase.com" target="_blank" style="color:var(--blue);">supabase.com</a> → créez un projet<br>
+            <strong>2.</strong> Dans <em>SQL Editor</em>, collez et exécutez ce script :<br>
+            <code style="display:block;margin:6px 0;padding:8px;background:var(--bg);border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;">create table if not exists english_app (
+  user_id text primary key,
+  dico jsonb, phrases jsonb,
+  pro jsonb, history jsonb,
+  updated_at timestamptz default now()
+);
+alter table english_app enable row level security;
+create policy "open" on english_app for all using (true);</code>
+            <strong>3.</strong> Settings → API → copiez <em>Project URL</em> et <em>anon public</em>
+          </div>
+        </details>
       </div>
-      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
-      <p class="modal-info">Pour synchroniser : exportez sur l'appareil A, envoyez-vous le fichier (email, iCloud, Drive…), puis importez sur l'appareil B.</p>
+      <div id="supabase-connected" style="display:none;">
+        <div class="modal-row">
+          <div>
+            <div class="modal-label">Sync automatique active</div>
+            <div class="modal-sublabel" id="sb-project-url-display"></div>
+          </div>
+          <button class="modal-btn" onclick="syncNow()" id="btn-sync-now">🔄 Sync</button>
+        </div>
+        <div class="modal-row" style="margin-top:4px;">
+          <div class="modal-label" style="color:var(--text3);font-size:12px;">Déconnecter Supabase</div>
+          <button class="modal-btn danger" style="font-size:12px;padding:6px 12px;" onclick="disconnectSupabase()">Déconnecter</button>
+        </div>
+      </div>
     </div>
 
+    <!-- STATS -->
     <div class="modal-section">
       <h3>Mes statistiques</h3>
       <div class="modal-row">
@@ -531,19 +560,40 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       </div>
     </div>
 
+    <!-- EXPORT MANUEL (backup) -->
+    <div class="modal-section">
+      <h3>Sauvegarde manuelle</h3>
+      <div class="modal-row">
+        <div>
+          <div class="modal-label">Exporter en JSON</div>
+          <div class="modal-sublabel">Backup local de toutes vos données</div>
+        </div>
+        <button class="modal-btn" onclick="exportData()">📤 Exporter</button>
+      </div>
+      <div class="modal-row">
+        <div>
+          <div class="modal-label">Importer un JSON</div>
+          <div class="modal-sublabel">Restaurer depuis un backup</div>
+        </div>
+        <button class="modal-btn" onclick="document.getElementById('import-file').click()">📥 Importer</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+
+    <!-- INSTALL -->
     <div class="modal-section">
       <h3>Installer l'application</h3>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Pour installer sur votre téléphone ou ordinateur :</p>
       <div style="font-size:13px;color:var(--text2);line-height:1.8;">
-        <strong>iPhone / Safari :</strong> Appuyez sur ⎋ Partager → "Sur l'écran d'accueil"<br>
+        <strong>iPhone / Safari :</strong> Partager ⎋ → "Sur l'écran d'accueil"<br>
         <strong>Android / Chrome :</strong> Menu ⋮ → "Ajouter à l'écran d'accueil"<br>
-        <strong>Ordinateur / Chrome :</strong> Icône ⊕ dans la barre d'adresse → Installer
+        <strong>Ordinateur / Chrome :</strong> Icône ⊕ dans la barre → Installer
       </div>
       <div id="install-btn-wrap" style="margin-top:12px;display:none;">
         <button class="btn-primary" onclick="installPWA()" style="width:100%;">Installer My English App</button>
       </div>
     </div>
 
+    <!-- RESET -->
     <div class="modal-section">
       <h3>Réinitialiser</h3>
       <div class="modal-row">
@@ -715,6 +765,7 @@ function addDicoEntry(){
   if(!w||!t){showToast('Remplissez les deux champs');return;}
   dicoData.unshift({word:w,trans:t,custom:true});
   saveData();
+  scheduleSyncToCloud();
   document.getElementById('new-word').value='';
   document.getElementById('new-trans').value='';
   toggleAddForm('dico-form');
@@ -753,6 +804,7 @@ function addPhraseEntry(){
   if(!w||!en){showToast('Remplissez au moins les deux premiers champs');return;}
   phraseData.unshift({word:w,en,fr,custom:true});
   saveData();
+  scheduleSyncToCloud();
   document.getElementById('new-pw').value='';
   document.getElementById('new-pen').value='';
   document.getElementById('new-pfr').value='';
@@ -842,6 +894,7 @@ function addProPhrase() {
   if (!proData[cat]) proData[cat] = [];
   proData[cat].push({ text: phrase, custom: true });
   saveProData();
+  scheduleSyncToCloud();
   document.getElementById('new-pro-phrase').value = '';
   document.getElementById('new-pro-cat-name').value = '';
   document.getElementById('new-cat-wrap').style.display = 'none';
@@ -855,6 +908,7 @@ function deleteProPhrase(cat, idx) {
   proData[cat].splice(idx, 1);
   if (proData[cat].length === 0) delete proData[cat];
   saveProData();
+  scheduleSyncToCloud();
   renderPro();
   showToast('Phrase supprimée');
 }
@@ -1061,76 +1115,243 @@ function renderDictHist(){
 }
 
 // ═══════════════════════════════════════════
+// SUPABASE SYNC
+// ═══════════════════════════════════════════
+const LS_SB_URL = 'eng_sb_url';
+const LS_SB_KEY = 'eng_sb_key';
+const LS_SB_UID = 'eng_sb_uid';
+const LS_SB_LAST = 'eng_sb_last';
+const SB_TABLE = 'english_app';
+let sbUrl = '', sbKey = '', sbUid = '';
+let syncTimer = null;
+let syncPending = false;
+
+function loadSupabaseConfig() {
+  sbUrl = localStorage.getItem(LS_SB_URL) || '';
+  sbKey = localStorage.getItem(LS_SB_KEY) || '';
+  sbUid = localStorage.getItem(LS_SB_UID) || '';
+  if (!sbUid) { sbUid = 'user_' + Math.random().toString(36).slice(2, 10); localStorage.setItem(LS_SB_UID, sbUid); }
+}
+
+function sbHeaders() {
+  return { 'Content-Type': 'application/json', 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey, 'Prefer': 'resolution=merge-duplicates' };
+}
+
+async function saveSupabaseConfig() {
+  const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { showToast('Remplissez les deux champs'); return; }
+  setSyncStatus('connecting');
+  try {
+    // Test connection with a simple query
+    const r = await fetch(`${url}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=user_id`, { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key } });
+    if (!r.ok && r.status !== 406) throw new Error(`Erreur ${r.status}`);
+    sbUrl = url; sbKey = key;
+    localStorage.setItem(LS_SB_URL, sbUrl);
+    localStorage.setItem(LS_SB_KEY, sbKey);
+    showSupabaseConnected();
+    await syncFromCloud(); // pull first
+    await syncToCloud();   // then push
+    showToast('Supabase connecté ! Sync active ✓');
+  } catch(e) {
+    setSyncStatus('error', 'Connexion échouée : ' + e.message);
+    showToast('Erreur connexion : ' + e.message);
+  }
+}
+
+function showSupabaseConnected() {
+  document.getElementById('supabase-config-wrap').style.display = 'none';
+  document.getElementById('supabase-connected').style.display = 'block';
+  const short = sbUrl.replace('https://','').split('.')[0];
+  document.getElementById('sb-project-url-display').textContent = short + '.supabase.co';
+}
+
+function disconnectSupabase() {
+  if (!confirm('Déconnecter Supabase ? Vos données restent en local.')) return;
+  sbUrl = ''; sbKey = '';
+  localStorage.removeItem(LS_SB_URL);
+  localStorage.removeItem(LS_SB_KEY);
+  localStorage.removeItem(LS_SB_LAST);
+  document.getElementById('supabase-connected').style.display = 'none';
+  document.getElementById('supabase-config-wrap').style.display = 'block';
+  setSyncStatus('off');
+  showToast('Supabase déconnecté');
+}
+
+async function syncToCloud() {
+  if (!sbUrl || !sbKey) return;
+  setSyncStatus('syncing');
+  try {
+    const payload = {
+      user_id: sbUid,
+      dico: JSON.stringify(dicoData.filter(e => e.custom)),        // only custom additions
+      phrases: JSON.stringify(phraseData.filter(e => e.custom)),
+      pro: JSON.stringify(proData),
+      history: JSON.stringify(dictHistory),
+      updated_at: new Date().toISOString()
+    };
+    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`, {
+      method: 'POST', headers: sbHeaders(), body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    localStorage.setItem(LS_SB_LAST, now);
+    setSyncStatus('ok', now);
+  } catch(e) {
+    setSyncStatus('error', 'Sync échouée');
+    console.warn('Sync error:', e);
+  }
+}
+
+async function syncFromCloud() {
+  if (!sbUrl || !sbKey) return;
+  try {
+    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=*`, {
+      headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const rows = await r.json();
+    if (!rows || rows.length === 0) return; // nothing yet
+    const row = rows[0];
+    // Merge cloud custom entries into base data
+    let changed = false;
+    if (row.dico) {
+      const cloudCustom = JSON.parse(row.dico);
+      const existing = new Set(dicoData.filter(e=>e.custom).map(e=>e.word.toLowerCase()));
+      cloudCustom.forEach(e => { if (!existing.has(e.word.toLowerCase())) { dicoData.push(e); changed = true; } });
+    }
+    if (row.phrases) {
+      const cloudPhrases = JSON.parse(row.phrases);
+      const existing = new Set(phraseData.filter(e=>e.custom).map(e=>e.word.toLowerCase()));
+      cloudPhrases.forEach(e => { if (!existing.has(e.word.toLowerCase())) { phraseData.push(e); changed = true; } });
+    }
+    if (row.pro) {
+      const cloudPro = JSON.parse(row.pro);
+      Object.entries(cloudPro).forEach(([cat, items]) => {
+        if (!proData[cat]) { proData[cat] = items; changed = true; }
+        else {
+          const existingTexts = new Set(proData[cat].map(i=>(typeof i==='string'?i:i.text).toLowerCase()));
+          items.filter(i=>i.custom).forEach(i => {
+            const t = (typeof i==='string'?i:i.text).toLowerCase();
+            if (!existingTexts.has(t)) { proData[cat].push(i); changed = true; }
+          });
+        }
+      });
+    }
+    if (row.history) { dictHistory = JSON.parse(row.history); }
+    if (changed) { saveData(); saveProData(); renderDico(); renderPhrases(); renderPro(); }
+    const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    localStorage.setItem(LS_SB_LAST, now);
+    setSyncStatus('ok', now);
+  } catch(e) {
+    setSyncStatus('error', 'Sync échouée');
+    console.warn('Pull error:', e);
+  }
+}
+
+async function syncNow() {
+  const btn = document.getElementById('btn-sync-now');
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  await syncFromCloud();
+  await syncToCloud();
+  if (btn) { btn.textContent = '🔄 Sync'; btn.disabled = false; }
+  showToast('Synchronisation effectuée !');
+}
+
+// Debounced auto-sync: called after every data change
+function scheduleSyncToCloud() {
+  if (!sbUrl || !sbKey) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncToCloud(), 2000); // 2s debounce
+}
+
+function setSyncStatus(state, detail) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-status-text');
+  const last = document.getElementById('sync-last');
+  const hdot = document.getElementById('header-sync-dot');
+  const states = {
+    off:         { color:'var(--text3)',  label:'Non configuré' },
+    connecting:  { color:'var(--amber)',  label:'Connexion...' },
+    syncing:     { color:'var(--amber)',  label:'Synchronisation...' },
+    ok:          { color:'var(--green)',  label:'Synchronisé' },
+    error:       { color:'#A32D2D',       label:'Erreur' }
+  };
+  const s = states[state] || states.off;
+  if (hdot) hdot.style.background = s.color;
+  if (!dot) return;
+  dot.style.background = s.color;
+  txt.style.color = s.color;
+  txt.textContent = s.label;
+  if (detail && state === 'ok') last.textContent = 'Dernière sync : ' + detail;
+  else if (detail && state === 'error') last.textContent = detail;
+  else last.textContent = '';
+}
+
+// ═══════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════
 function openSettings() {
   document.getElementById('settings-modal').classList.add('open');
-  const custom=dicoData.filter(e=>e.custom).length;
-  document.getElementById('stats-dico').textContent=dicoData.length;
-  document.getElementById('stats-phrase').textContent=phraseData.length;
-  document.getElementById('stats-custom').textContent=custom;
+  const custom = dicoData.filter(e => e.custom).length;
+  document.getElementById('stats-dico').textContent = dicoData.length;
+  document.getElementById('stats-phrase').textContent = phraseData.length;
+  document.getElementById('stats-custom').textContent = custom;
+  // Show/hide Supabase config vs connected state
+  if (sbUrl && sbKey) {
+    showSupabaseConnected();
+    const lastSync = localStorage.getItem(LS_SB_LAST);
+    setSyncStatus('ok', lastSync || '');
+  } else {
+    document.getElementById('supabase-config-wrap').style.display = 'block';
+    document.getElementById('supabase-connected').style.display = 'none';
+    setSyncStatus('off');
+  }
 }
 function closeSettings(e) {
-  if(!e||e.target===document.getElementById('settings-modal'))
+  if (!e || e.target === document.getElementById('settings-modal'))
     document.getElementById('settings-modal').classList.remove('open');
 }
 
 function exportData() {
-  const payload={
-    version:2,
-    exportDate:new Date().toISOString(),
-    dico:dicoData,
-    phrases:phraseData,
-    pro:proData,
-    dictHistory
-  };
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=`english-app-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
+  const payload = { version: 2, exportDate: new Date().toISOString(), dico: dicoData, phrases: phraseData, pro: proData, dictHistory };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `english-app-${new Date().toISOString().slice(0,10)}.json`; a.click();
   URL.revokeObjectURL(url);
   showToast('Données exportées !');
 }
 
 function importData(e) {
-  const file=e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const data=JSON.parse(ev.target.result);
-      if(!data.dico||!data.phrases)throw new Error('Format invalide');
-      if(confirm(`Importer ${data.dico.length} mots et ${data.phrases.length} phrases ?\n\nCela remplacera vos données actuelles.`)){
-        dicoData=data.dico;
-        phraseData=data.phrases;
-        if(data.pro){ proData=data.pro; saveProData(); }
-        if(data.dictHistory)dictHistory=data.dictHistory;
-        saveData();
-        renderDico();
-        renderPhrases();
-        showToast('Import réussi !');
-        closeSettings(null);
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.dico || !data.phrases) throw new Error('Format invalide');
+      if (confirm(`Importer ${data.dico.length} mots et ${data.phrases.length} phrases ?\nCela remplacera vos données actuelles.`)) {
+        dicoData = data.dico; phraseData = data.phrases;
+        if (data.pro) { proData = data.pro; saveProData(); }
+        if (data.dictHistory) dictHistory = data.dictHistory;
+        saveData(); renderDico(); renderPhrases();
+        scheduleSyncToCloud();
+        showToast('Import réussi !'); closeSettings(null);
       }
-    }catch(err){
-      showToast('Erreur : fichier invalide');
-    }
+    } catch(err) { showToast('Erreur : fichier invalide'); }
   };
-  reader.readAsText(file);
-  e.target.value='';
+  reader.readAsText(file); e.target.value = '';
 }
 
 function resetData() {
-  if(confirm('Réinitialiser tout ? Vos ajouts personnels seront perdus.')){
-    dicoData=BASE_DICO.map(([w,t])=>({word:w,trans:t,custom:false}));
-    phraseData=BASE_PHRASES.map(([w,e,f])=>({word:w,en:e,fr:f,custom:false}));
-    proData={};
-    Object.entries(PRO_DATA).forEach(([cat,phrases])=>{ proData[cat]=phrases.map(p=>({text:p,custom:false})); });
-    saveData(); saveProData();
-    renderDico(); renderPhrases(); renderPro();
-    showToast('Données réinitialisées');
-    closeSettings(null);
+  if (confirm('Réinitialiser tout ? Vos ajouts personnels seront perdus.')) {
+    dicoData = BASE_DICO.map(([w,t]) => ({word:w, trans:t, custom:false}));
+    phraseData = BASE_PHRASES.map(p => ({word:p.word, en:p.en, fr:p.fr||'', custom:false}));
+    proData = {};
+    Object.entries(PRO_DATA).forEach(([cat, phrases]) => { proData[cat] = phrases.map(p => ({text:p, custom:false})); });
+    saveData(); saveProData(); renderDico(); renderPhrases(); renderPro();
+    scheduleSyncToCloud();
+    showToast('Données réinitialisées'); closeSettings(null);
   }
 }
 
@@ -1186,6 +1407,7 @@ if('serviceWorker' in navigator){
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
+loadSupabaseConfig();
 loadData();
 loadProData();
 renderDico();
@@ -1193,6 +1415,13 @@ renderPhrases();
 renderPro();
 initQuiz();
 renderDictHist();
+
+// Pull from cloud on startup (silent, after render)
+if (sbUrl && sbKey) {
+  setTimeout(() => syncFromCloud(), 1500);
+  // Periodic sync every 5 minutes while app is open
+  setInterval(() => syncToCloud(), 5 * 60 * 1000);
+}
 </script>
 </body>
 </html>
