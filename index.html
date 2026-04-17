@@ -982,9 +982,11 @@ function renderPro() {
         const isCustom = typeof item === 'object' && item.custom;
         const catEsc = cat.replace(/\\/g,'\\\\').replace(/`/g,'\\`');
         const pEsc = p.replace(/\\/g,'\\\\').replace(/`/g,'\\`');
+        const pSpeak = p.replace(/'/g,"\\'");
         return `<div class="pro-phrase-item">
           <div class="pro-phrase-text">${p}</div>
-          <div style="display:flex;gap:5px;flex-shrink:0;">
+          <div style="display:flex;gap:5px;flex-shrink:0;align-items:center;">
+            <button class="sound-btn" onclick="speak('${pSpeak}','en')" title="Écouter">🔊</button>
             <button class="copy-btn" onclick="copyPro(this,\`${pEsc}\`)">Copier</button>
             ${isCustom ? `<button class="copy-btn" style="color:#A32D2D;border-color:rgba(163,45,45,0.3);" onclick="deleteProPhrase(\`${catEsc}\`,${idx})">✕</button>` : ''}
           </div>
