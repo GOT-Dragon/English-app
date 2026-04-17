@@ -1354,7 +1354,7 @@ async function syncToCloud() {
   try {
     const payload = {
       user_id: sbUid,
-      dico: JSON.stringify(dicoData.filter(e => e.custom)),        // only custom additions
+      dico: JSON.stringify(dicoData.filter(e => e.custom)),
       phrases: JSON.stringify(phraseData.filter(e => e.custom)),
       pro: JSON.stringify(proData),
       dict_history: JSON.stringify(dictHistory),
@@ -1366,6 +1366,7 @@ async function syncToCloud() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     localStorage.setItem(LS_SB_LAST, now);
+    localStorage.setItem('eng_sb_pushed_at', new Date().toISOString());
     setSyncStatus('ok', now);
   } catch(e) {
     setSyncStatus('error', 'Sync échouée');
@@ -1381,35 +1382,58 @@ async function syncFromCloud() {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const rows = await r.json();
-    if (!rows || rows.length === 0) return; // nothing yet
+    if (!rows || rows.length === 0) return;
     const row = rows[0];
-    // Merge cloud custom entries into base data
+
+    // Compare cloud updated_at vs local last push
+    const cloudTime = new Date(row.updated_at).getTime();
+    const localPushed = new Date(localStorage.getItem('eng_sb_pushed_at') || 0).getTime();
+
+    // Always apply cloud data — replace local custom entries entirely with cloud
     let changed = false;
+
     if (row.dico) {
       const cloudCustom = JSON.parse(row.dico);
-      const existing = new Set(dicoData.filter(e=>e.custom).map(e=>e.word.toLowerCase()));
-      cloudCustom.forEach(e => { if (!existing.has(e.word.toLowerCase())) { dicoData.push(e); changed = true; } });
+      // Remove old local custom entries, replace with cloud ones
+      dicoData = dicoData.filter(e => !e.custom);
+      cloudCustom.forEach(e => { e.custom = true; dicoData.unshift(e); });
+      changed = true;
     }
+
     if (row.phrases) {
       const cloudPhrases = JSON.parse(row.phrases);
-      const existing = new Set(phraseData.filter(e=>e.custom).map(e=>e.word.toLowerCase()));
-      cloudPhrases.forEach(e => { if (!existing.has(e.word.toLowerCase())) { phraseData.push(e); changed = true; } });
+      phraseData = phraseData.filter(e => !e.custom);
+      cloudPhrases.forEach(e => { e.custom = true; phraseData.unshift(e); });
+      changed = true;
     }
+
     if (row.pro) {
       const cloudPro = JSON.parse(row.pro);
+      // Merge pro categories — cloud wins for custom items
       Object.entries(cloudPro).forEach(([cat, items]) => {
-        if (!proData[cat]) { proData[cat] = items; changed = true; }
-        else {
-          const existingTexts = new Set(proData[cat].map(i=>(typeof i==='string'?i:i.text).toLowerCase()));
-          items.filter(i=>i.custom).forEach(i => {
-            const t = (typeof i==='string'?i:i.text).toLowerCase();
-            if (!existingTexts.has(t)) { proData[cat].push(i); changed = true; }
-          });
+        if (!proData[cat]) {
+          proData[cat] = items;
+        } else {
+          // Keep base items, replace custom ones with cloud
+          const baseItems = proData[cat].filter(i => !(typeof i === 'object' && i.custom));
+          const cloudCustomItems = items.filter(i => typeof i === 'object' && i.custom);
+          proData[cat] = [...baseItems, ...cloudCustomItems];
         }
+        changed = true;
       });
     }
-    if (row.dict_history) { dictHistory = JSON.parse(row.dict_history); }
-    if (changed) { saveData(); saveProData(); renderDico(); renderPhrases(); renderPro(); }
+
+    if (row.dict_history) dictHistory = JSON.parse(row.dict_history);
+
+    if (changed) {
+      saveData();
+      saveProData();
+      renderDico();
+      renderPhrases();
+      renderPro();
+      showToast('Données synchronisées ✓');
+    }
+
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     localStorage.setItem(LS_SB_LAST, now);
     setSyncStatus('ok', now);
