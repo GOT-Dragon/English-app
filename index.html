@@ -1286,6 +1286,7 @@ function renderDictHist() { renderTradHist(); }
 const LS_SB_URL = 'eng_sb_url';
 const LS_SB_KEY = 'eng_sb_key';
 const LS_SB_UID = 'eng_sb_uid';
+const FIXED_UID = 'got_dragon_main'; // même ID sur tous les appareils
 const LS_SB_LAST = 'eng_sb_last';
 const SB_TABLE = 'english_app';
 let sbUrl = 'https://nibejtyghkbcgklzepoh.supabase.co', sbKey = 'sb_publishable_xLBQBNWUZ93lm1AhW2otyA_L5e0I-Ac', sbUid = '';
@@ -1295,8 +1296,8 @@ let syncPending = false;
 function loadSupabaseConfig() {
   sbUrl = localStorage.getItem(LS_SB_URL) || 'https://nibejtyghkbcgklzepoh.supabase.co';
   sbKey = localStorage.getItem(LS_SB_KEY) || 'sb_publishable_xLBQBNWUZ93lm1AhW2otyA_L5e0I-Ac';
-  sbUid = localStorage.getItem(LS_SB_UID) || '';
-  if (!sbUid) { sbUid = 'user_' + Math.random().toString(36).slice(2, 10); localStorage.setItem(LS_SB_UID, sbUid); }
+  sbUid = FIXED_UID;
+  localStorage.setItem(LS_SB_UID, sbUid);
   // Persist defaults so they survive
   if (!localStorage.getItem(LS_SB_URL)) localStorage.setItem(LS_SB_URL, sbUrl);
   if (!localStorage.getItem(LS_SB_KEY)) localStorage.setItem(LS_SB_KEY, sbKey);
