@@ -177,33 +177,45 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .routine-item { font-size: 12px; color: var(--text2); padding: 4px 0; border-bottom: 0.5px solid var(--border); line-height: 1.4; }
 .routine-item:last-child { border-bottom: none; }
 
-/* DICT */
-.dict-result { background: var(--surface); border-radius: var(--radius-lg); border: 0.5px solid var(--border); overflow: hidden; box-shadow: var(--shadow); }
-.dict-word-header { padding: 16px; background: var(--blue-light); border-bottom: 0.5px solid var(--border); }
-.dict-word-main { display: flex; align-items: flex-start; justify-content: space-between; }
-.dict-word-text { font-size: 22px; font-weight: 700; color: var(--blue); }
-.dict-phonetic { font-size: 14px; color: var(--text2); margin-top: 3px; }
-.dict-copy-all { padding: 6px 12px; border-radius: 8px; border: 0.5px solid var(--blue); background: white; color: var(--blue); font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; margin-left: 10px; }
-.dict-copy-all:active { background: var(--blue-light); }
-.dict-copy-all.copied { background: var(--green-light); color: var(--green); border-color: var(--green); }
-.dict-section { padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
-.dict-section:last-child { border-bottom: none; }
-.dict-section h4 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); font-weight: 600; margin-bottom: 8px; }
-.dict-def { padding: 6px 0; border-bottom: 0.5px solid var(--border); font-size: 14px; color: var(--text); line-height: 1.5; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.dict-def:last-child { border-bottom: none; }
-.dict-def-text { flex: 1; }
-.dict-ex { font-size: 12px; color: var(--text2); font-style: italic; margin-top: 3px; }
-.copy-def-btn { flex-shrink: 0; padding: 3px 8px; border-radius: 6px; border: 0.5px solid var(--border); background: var(--surface2); font-size: 11px; cursor: pointer; color: var(--text2); }
-.copy-def-btn.copied { background: var(--green-light); color: var(--green); }
-.dict-syn { font-size: 13px; color: var(--blue); line-height: 1.6; }
-.dict-my-word { padding: 12px 16px; background: var(--green-light); display: flex; align-items: center; justify-content: space-between; }
-.dict-my-word span { font-size: 13px; color: var(--green); }
-.dict-add-btn { padding: 5px 12px; border-radius: 8px; border: 0.5px solid var(--green); background: white; color: var(--green); font-size: 12px; font-weight: 600; cursor: pointer; }
-.dict-not-found { padding: 24px; text-align: center; color: var(--text2); font-size: 14px; }
-.dict-offline { padding: 16px; background: var(--amber-light); border-radius: var(--radius); text-align: center; color: var(--amber); font-size: 13px; margin-top: 10px; }
-.history-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
-.history-chip { padding: 4px 10px; border-radius: 14px; border: 0.5px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text2); }
-.history-chip:active { background: var(--surface2); }
+/* TRANSLATOR */
+.trad-lang-bar { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.trad-lang-btn { flex:1; padding:10px; border-radius:var(--radius); border:0.5px solid var(--border); background:var(--surface); font-size:14px; font-weight:600; cursor:pointer; color:var(--blue); text-align:center; }
+.trad-lang-btn.active { background:var(--blue); color:white; border-color:var(--blue); }
+.trad-swap { width:38px; height:38px; border-radius:50%; border:0.5px solid var(--border); background:var(--surface); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.trad-swap:active { background:var(--surface2); transform:rotate(180deg); transition:transform 0.3s; }
+.trad-input-wrap { position:relative; margin-bottom:10px; }
+.trad-textarea { width:100%; min-height:90px; padding:12px 14px; border-radius:var(--radius-lg); border:0.5px solid var(--border); background:var(--surface); font-size:15px; color:var(--text); font-family:inherit; resize:none; outline:none; line-height:1.5; }
+.trad-textarea:focus { border-color:var(--blue); }
+.trad-clear { position:absolute; top:10px; right:10px; width:22px; height:22px; border-radius:50%; border:none; background:var(--text3); color:white; font-size:13px; cursor:pointer; display:none; align-items:center; justify-content:center; line-height:1; }
+.trad-clear.visible { display:flex; }
+.trad-result-card { background:var(--blue-light); border-radius:var(--radius-lg); border:0.5px solid rgba(24,95,165,0.2); overflow:hidden; margin-bottom:12px; }
+.trad-result-header { padding:14px 16px 10px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.trad-result-text { font-size:18px; font-weight:600; color:var(--blue); line-height:1.4; flex:1; }
+.trad-copy-btn { flex-shrink:0; padding:6px 12px; border-radius:8px; border:0.5px solid var(--blue); background:white; color:var(--blue); font-size:12px; font-weight:600; cursor:pointer; }
+.trad-copy-btn.copied { background:var(--green-light); color:var(--green); border-color:var(--green); }
+.trad-phonetic { padding:0 16px 10px; font-size:13px; color:var(--text2); font-style:italic; }
+.trad-alt-wrap { padding:0 16px 12px; }
+.trad-alt-label { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text3); font-weight:600; margin-bottom:6px; }
+.trad-alt-chip { display:inline-block; padding:4px 10px; border-radius:12px; background:white; border:0.5px solid rgba(24,95,165,0.2); font-size:13px; color:var(--blue); margin:2px 3px 2px 0; cursor:pointer; }
+.trad-alt-chip:active { background:var(--blue-light); }
+.trad-examples { background:var(--surface); border-radius:var(--radius-lg); border:0.5px solid var(--border); overflow:hidden; margin-bottom:12px; }
+.trad-examples-header { padding:12px 16px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.trad-examples-header h4 { font-size:12px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.06em; }
+.trad-example { padding:11px 16px; border-bottom:0.5px solid var(--border); }
+.trad-example:last-child { border-bottom:none; }
+.trad-ex-en { font-size:13px; color:var(--text); line-height:1.5; margin-bottom:3px; }
+.trad-ex-fr { font-size:12px; color:var(--text2); font-style:italic; line-height:1.4; }
+.trad-ex-highlight { color:var(--blue); font-weight:600; }
+.trad-add-bar { padding:12px 16px; background:var(--surface2); display:flex; align-items:center; justify-content:space-between; gap:10px; border-radius:var(--radius-lg); border:0.5px solid var(--border); margin-bottom:12px; }
+.trad-add-bar span { font-size:13px; color:var(--text2); flex:1; }
+.trad-history { display:flex; gap:5px; flex-wrap:wrap; margin-top:4px; }
+.trad-hist-chip { padding:4px 10px; border-radius:14px; border:0.5px solid var(--border); background:var(--surface); font-size:12px; cursor:pointer; color:var(--text2); }
+.trad-hist-chip:active { background:var(--surface2); }
+.trad-loading { padding:20px; text-align:center; color:var(--text2); font-size:14px; }
+.trad-error { padding:16px; background:var(--amber-light); border-radius:var(--radius); color:var(--amber); font-size:13px; text-align:center; }
+.history-row { display:flex; gap:5px; flex-wrap:wrap; margin-top:10px; }
+.history-chip { padding:4px 10px; border-radius:14px; border:0.5px solid var(--border); background:var(--surface); font-size:12px; cursor:pointer; color:var(--text2); }
+.history-chip:active { background:var(--surface2); }
 
 /* SETTINGS MODAL */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: none; align-items: flex-end; }
@@ -460,14 +472,35 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       </div>
     </div>
 
-    <!-- DICT -->
+    <!-- TRADUCTEUR -->
     <div class="section" id="s-dict">
-      <div class="search-wrap">
-        <input class="search-input" id="dict-input" placeholder="Entrez un mot en anglais..." onkeydown="if(event.key==='Enter')searchDict()">
-        <button class="btn-primary" onclick="searchDict()">Go</button>
+
+      <!-- Barre de langue -->
+      <div class="trad-lang-bar">
+        <button class="trad-lang-btn active" id="btn-lang-en" onclick="setLang('en')">🇬🇧 Anglais</button>
+        <button class="trad-swap" onclick="swapLang()" title="Inverser">⇄</button>
+        <button class="trad-lang-btn" id="btn-lang-fr" onclick="setLang('fr')">🇫🇷 Français</button>
       </div>
-      <div id="dict-result"></div>
-      <div class="history-row" id="dict-history"></div>
+
+      <!-- Zone de saisie -->
+      <div class="trad-input-wrap">
+        <textarea class="trad-textarea" id="trad-input"
+          placeholder="Entrez un mot ou une phrase..."
+          oninput="onTradInput()"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();translate();}"></textarea>
+        <button class="trad-clear" id="trad-clear-btn" onclick="clearTrad()">✕</button>
+      </div>
+      <button class="btn-primary" onclick="translate()" style="width:100%;margin-bottom:14px;">Traduire</button>
+
+      <!-- Résultat -->
+      <div id="trad-result"></div>
+
+      <!-- Historique -->
+      <div style="margin-top:4px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Recherches récentes</div>
+        <div class="trad-history" id="trad-hist"></div>
+      </div>
+
     </div>
 
   </div>
@@ -484,7 +517,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <span class="nav-icon">✍️</span>Écrit
     </button>
     <button class="nav-item" onclick="goSection('dict',this)">
-      <span class="nav-icon">🔍</span>Dico
+      <span class="nav-icon">🌐</span>Traduire
     </button>
   </nav>
 </div>
@@ -1009,110 +1042,243 @@ function answerQ(btn,chosen,correct){
 }
 
 // ═══════════════════════════════════════════
-// DICTIONARY
 // ═══════════════════════════════════════════
-async function searchDict(){
-  const word=document.getElementById('dict-input').value.trim().toLowerCase();
-  if(!word)return;
-  const el=document.getElementById('dict-result');
-  el.innerHTML=`<div style="padding:24px;text-align:center;color:var(--text2);font-size:14px;">Recherche en cours...</div>`;
-  if(!dictHistory.includes(word)){dictHistory.unshift(word);if(dictHistory.length>10)dictHistory.pop();saveData();}
-  renderDictHist();
-  try{
-    const r=await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-    if(!r.ok)throw new Error('not found');
-    const data=await r.json();
-    const e=data[0];
+// TRADUCTEUR EN ↔ FR
+// ═══════════════════════════════════════════
+let tradLang = 'en'; // source language
+let tradTimer = null;
+let tradHistory = JSON.parse(localStorage.getItem('eng_trad_hist') || '[]');
 
-    // Build full text for copy-all
-    let fullText=e.word;
-    const ph=e.phonetics?.find(p=>p.text);
-    if(ph)fullText+=` ${ph.text}`;
-    fullText+='\n';
-    e.meanings.slice(0,3).forEach(m=>{
-      fullText+=`\n[${m.partOfSpeech}]\n`;
-      m.definitions.slice(0,3).forEach((d,i)=>{
-        fullText+=`${i+1}. ${d.definition}`;
-        if(d.example)fullText+=` — "${d.example}"`;
-        fullText+='\n';
-      });
-    });
-    if(e.meanings[0]?.synonyms?.length)fullText+=`\nSynonymes : ${e.meanings[0].synonyms.slice(0,6).join(', ')}`;
+function setLang(lang) {
+  tradLang = lang;
+  document.getElementById('btn-lang-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-lang-fr').classList.toggle('active', lang === 'fr');
+  const ph = lang === 'en' ? 'Entrez un mot ou une phrase en anglais...' : 'Entrez un mot ou une phrase en français...';
+  document.getElementById('trad-input').placeholder = ph;
+  const val = document.getElementById('trad-input').value.trim();
+  if (val) translate();
+}
 
-    let h=`<div class="dict-result">
-      <div class="dict-word-header">
-        <div class="dict-word-main">
-          <div>
-            <div class="dict-word-text">${e.word}</div>
-            ${ph?`<div class="dict-phonetic">${ph.text}</div>`:''}
-          </div>
-          <button class="dict-copy-all" onclick="copyAll(this,\`${fullText.replace(/`/g,'\\`')}\`)">📋 Tout copier</button>
+function swapLang() {
+  // Swap source lang and put current translation as new input
+  const result = document.getElementById('trad-result');
+  const mainTrad = result.querySelector('.trad-result-text');
+  const newInput = mainTrad ? mainTrad.textContent.trim() : '';
+  tradLang = tradLang === 'en' ? 'fr' : 'en';
+  document.getElementById('btn-lang-en').classList.toggle('active', tradLang === 'en');
+  document.getElementById('btn-lang-fr').classList.toggle('active', tradLang === 'fr');
+  if (newInput) {
+    document.getElementById('trad-input').value = newInput;
+    document.getElementById('trad-clear-btn').classList.add('visible');
+    translate();
+  }
+}
+
+function onTradInput() {
+  const val = document.getElementById('trad-input').value;
+  document.getElementById('trad-clear-btn').classList.toggle('visible', val.length > 0);
+  clearTimeout(tradTimer);
+  if (val.trim().length >= 2) tradTimer = setTimeout(translate, 600);
+  else document.getElementById('trad-result').innerHTML = '';
+}
+
+function clearTrad() {
+  document.getElementById('trad-input').value = '';
+  document.getElementById('trad-clear-btn').classList.remove('visible');
+  document.getElementById('trad-result').innerHTML = '';
+}
+
+async function translate() {
+  const word = document.getElementById('trad-input').value.trim();
+  if (!word) return;
+  const el = document.getElementById('trad-result');
+  el.innerHTML = `<div class="trad-loading">Traduction en cours...</div>`;
+  const srcLang = tradLang;
+  const tgtLang = tradLang === 'en' ? 'fr' : 'en';
+
+  // Save to history
+  const histKey = word + '|' + srcLang;
+  if (!tradHistory.find(h => h.key === histKey)) {
+    tradHistory.unshift({ key: histKey, word, lang: srcLang });
+    if (tradHistory.length > 12) tradHistory.pop();
+    localStorage.setItem('eng_trad_hist', JSON.stringify(tradHistory));
+    renderTradHist();
+  }
+
+  try {
+    // 1. Main translation via MyMemory API (free, no key needed)
+    const langPair = `${srcLang}|${tgtLang}`;
+    const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${langPair}`;
+    const mmRes = await fetch(mmUrl);
+    if (!mmRes.ok) throw new Error('MyMemory error');
+    const mmData = await mmRes.json();
+    const mainTrans = mmData.responseData?.translatedText || '';
+    if (!mainTrans || mmData.responseStatus !== 200) throw new Error('No translation');
+
+    // 2. Alternative translations from MyMemory matches
+    const matches = mmData.matches || [];
+    const alts = [...new Set(
+      matches
+        .filter(m => m.translation && m.translation.toLowerCase() !== mainTrans.toLowerCase())
+        .map(m => m.translation)
+        .slice(0, 6)
+    )];
+
+    // 3. Examples via Free Dictionary API (EN only — for phonetic + usage)
+    let phonetic = '';
+    let examples = [];
+    if (srcLang === 'en' && word.split(' ').length === 1) {
+      try {
+        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`);
+        if (fdRes.ok) {
+          const fdData = await fdRes.json();
+          const entry = fdData[0];
+          phonetic = entry.phonetics?.find(p => p.text)?.text || '';
+          // Extract examples with their context
+          entry.meanings?.forEach(m => {
+            m.definitions?.forEach(d => {
+              if (d.example) examples.push({ en: d.example, type: m.partOfSpeech });
+            });
+          });
+          examples = examples.slice(0, 4);
+        }
+      } catch(e) { /* skip */ }
+    }
+
+    // 4. If FR source, try to get examples from a reverse lookup
+    if (srcLang === 'fr' && mainTrans && mainTrans.split(' ').length === 1) {
+      try {
+        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(mainTrans.toLowerCase())}`);
+        if (fdRes.ok) {
+          const fdData = await fdRes.json();
+          const entry = fdData[0];
+          phonetic = entry.phonetics?.find(p => p.text)?.text || '';
+          entry.meanings?.forEach(m => {
+            m.definitions?.forEach(d => {
+              if (d.example) examples.push({ en: d.example, type: m.partOfSpeech });
+            });
+          });
+          examples = examples.slice(0, 4);
+        }
+      } catch(e) { /* skip */ }
+    }
+
+    // Build HTML
+    const displayWord = srcLang === 'en' ? word : mainTrans;
+    const displayTrans = srcLang === 'en' ? mainTrans : word;
+    const copyText = mainTrans;
+    const copyEsc = mainTrans.replace(/`/g, '\\`').replace(/'/g, "\\'");
+
+    let h = `<div class="trad-result-card">
+      <div class="trad-result-header">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${tgtLang === 'fr' ? '🇫🇷 Traduction française' : '🇬🇧 English translation'}</div>
+          <div class="trad-result-text">${mainTrans}</div>
         </div>
+        <button class="trad-copy-btn" onclick="copyTrad(this,'${copyEsc}')">📋 Copier</button>
       </div>`;
 
-    e.meanings.slice(0,3).forEach(m=>{
-      h+=`<div class="dict-section"><h4>${m.partOfSpeech}</h4>`;
-      m.definitions.slice(0,3).forEach((d,i)=>{
-        const defText=`${e.word}: ${d.definition}${d.example?` — "${d.example}"`:''}`;
-        const ds=defText.replace(/`/g,'\\`');
-        h+=`<div class="dict-def">
-          <div class="dict-def-text">${d.definition}${d.example?`<div class="dict-ex">"${d.example}"</div>`:''}
-          </div>
-          <button class="copy-def-btn" onclick="copyDef(this,\`${ds}\`)">Copier</button>
+    if (phonetic) {
+      h += `<div class="trad-phonetic">${srcLang === 'en' ? word : mainTrans} ${phonetic}</div>`;
+    }
+
+    if (alts.length > 0) {
+      h += `<div class="trad-alt-wrap">
+        <div class="trad-alt-label">Autres traductions</div>
+        <div>${alts.map(a => {
+          const ae = a.replace(/'/g, "\\'");
+          return `<span class="trad-alt-chip" onclick="useAlt('${ae}')">${a}</span>`;
+        }).join('')}</div>
+      </div>`;
+    }
+
+    h += `</div>`;
+
+    // Examples section
+    if (examples.length > 0) {
+      h += `<div class="trad-examples">
+        <div class="trad-examples-header">
+          <h4>Exemples d'utilisation</h4>
+          <span style="font-size:11px;color:var(--text3);">${examples.length} exemple${examples.length > 1 ? 's' : ''}</span>
+        </div>`;
+      const searchWord = srcLang === 'en' ? word : mainTrans;
+      examples.forEach(ex => {
+        // Highlight the searched word in the example
+        const re = new RegExp(`\\b(${searchWord.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})\\b`, 'gi');
+        const highlighted = ex.en.replace(re, '<span class="trad-ex-highlight">$1</span>');
+        h += `<div class="trad-example">
+          <div class="trad-ex-en">${highlighted}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px;font-style:normal;">${ex.type}</div>
         </div>`;
       });
-      h+=`</div>`;
-    });
-
-    if(e.meanings[0]?.synonyms?.length){
-      h+=`<div class="dict-section"><h4>Synonymes</h4><div class="dict-syn">${e.meanings[0].synonyms.slice(0,8).join(', ')}</div></div>`;
+      h += `</div>`;
     }
 
-    // Check if word is in personal dico
-    const mine=dicoData.find(x=>x.word.toLowerCase()===word);
-    if(mine){
-      h+=`<div class="dict-my-word"><span>Dans votre dico : <strong>${mine.trans}</strong></span></div>`;
-    } else {
-      h+=`<div class="dict-my-word" style="background:var(--surface2);"><span style="color:var(--text2);">Ajouter à votre dico ?</span>
-        <button class="dict-add-btn" onclick="quickAddDico('${e.word.replace(/'/g,"\\'")}','${word}')">+ Ajouter</button>
+    // Add to personal dico suggestion
+    const inDico = dicoData.find(d => d.word.toLowerCase() === (srcLang === 'en' ? word : mainTrans).toLowerCase());
+    if (!inDico && word.split(' ').length <= 3) {
+      const engWord = srcLang === 'en' ? word : mainTrans;
+      const frWord = srcLang === 'en' ? mainTrans : word;
+      const ew = engWord.replace(/'/g, "\\'");
+      const fw = frWord.replace(/'/g, "\\'");
+      h += `<div class="trad-add-bar">
+        <span>Ajouter "<strong>${engWord}</strong>" à votre dico personnel ?</span>
+        <button class="btn-primary" style="font-size:12px;padding:7px 14px;" onclick="addFromTrad('${ew}','${fw}')">+ Ajouter</button>
       </div>`;
     }
-    h+=`</div>`;
-    el.innerHTML=h;
-  }catch(err){
-    if(!navigator.onLine){
-      el.innerHTML=`<div class="dict-offline">Vous êtes hors ligne. La recherche nécessite une connexion internet.</div>`;
+
+    el.innerHTML = h;
+
+  } catch(err) {
+    if (!navigator.onLine) {
+      el.innerHTML = `<div class="trad-error">Vous êtes hors ligne. La traduction nécessite une connexion internet.</div>`;
     } else {
-      el.innerHTML=`<div class="dict-not-found">Aucun résultat pour "<strong>${word}</strong>".<br>Vérifiez l'orthographe ou essayez un autre mot.</div>`;
+      el.innerHTML = `<div class="trad-error">Traduction introuvable pour "<strong>${word}</strong>".<br>Vérifiez l'orthographe ou réessayez.</div>`;
     }
   }
 }
 
-function copyAll(btn, text) {
+function copyTrad(btn, text) {
   copyToClipboard(text);
-  btn.textContent='✓ Copié !';
+  btn.textContent = '✓ Copié !';
   btn.classList.add('copied');
-  setTimeout(()=>{btn.textContent='📋 Tout copier';btn.classList.remove('copied');},2000);
-  showToast('Tout copié dans le presse-papier');
+  setTimeout(() => { btn.textContent = '📋 Copier'; btn.classList.remove('copied'); }, 1800);
+  showToast('Traduction copiée !');
 }
-function copyDef(btn, text) {
-  copyToClipboard(text);
-  btn.textContent='✓';
-  btn.classList.add('copied');
-  setTimeout(()=>{btn.textContent='Copier';btn.classList.remove('copied');},1500);
+
+function useAlt(text) {
+  // Click on an alternative — show it as main and offer to copy
+  const el = document.querySelector('.trad-result-text');
+  if (el) el.textContent = text;
+  const copyBtn = document.querySelector('.trad-copy-btn');
+  if (copyBtn) copyBtn.onclick = () => copyTrad(copyBtn, text);
 }
-function quickAddDico(word, search) {
-  const trans=prompt(`Traduction de "${word}" :`);
-  if(!trans)return;
-  dicoData.unshift({word,trans,custom:true});
+
+function addFromTrad(engWord, frWord) {
+  dicoData.unshift({ word: engWord, trans: frWord, custom: true });
   saveData();
-  showToast(`"${word}" ajouté à votre dico !`);
-  searchDict();
+  scheduleSyncToCloud();
+  showToast(`"${engWord}" ajouté au dico !`);
+  // Remove the add bar
+  const bar = document.querySelector('.trad-add-bar');
+  if (bar) {
+    bar.innerHTML = `<span style="color:var(--green);">✓ <strong>${engWord}</strong> ajouté à votre dico</span>`;
+  }
 }
-function renderDictHist(){
-  document.getElementById('dict-history').innerHTML=dictHistory.map(w=>`
-    <button class="history-chip" onclick="document.getElementById('dict-input').value='${w}';searchDict()">${w}</button>`).join('');
+
+function renderTradHist() {
+  const el = document.getElementById('trad-hist');
+  if (!el) return;
+  el.innerHTML = tradHistory.map(h => {
+    const flag = h.lang === 'en' ? '🇬🇧' : '🇫🇷';
+    const we = h.word.replace(/'/g, "\\'");
+    return `<button class="trad-hist-chip" onclick="setLang('${h.lang}');document.getElementById('trad-input').value='${we}';document.getElementById('trad-clear-btn').classList.add('visible');translate();">${flag} ${h.word}</button>`;
+  }).join('');
 }
+
+// Legacy stubs (kept for Supabase sync compatibility)
+function searchDict() { translate(); }
+function renderDictHist() { renderTradHist(); }
 
 // ═══════════════════════════════════════════
 // SUPABASE SYNC
@@ -1412,7 +1578,7 @@ renderDico();
 renderPhrases();
 renderPro();
 initQuiz();
-renderDictHist();
+renderTradHist();
 
 // Pull from cloud on startup (silent, after render)
 if (sbUrl && sbKey) {
