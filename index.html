@@ -503,7 +503,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         <span id="sync-status-text" style="font-size:13px;color:var(--text2);">Non configuré</span>
         <span id="sync-last" style="font-size:11px;color:var(--text3);margin-left:auto;"></span>
       </div>
-      <div id="supabase-config-wrap">
+      <div id="supabase-config-wrap" style="display:none;">
         <div class="form-field" style="margin-bottom:8px;">
           <input id="sb-url" placeholder="Project URL  (https://xxxx.supabase.co)" style="width:100%;padding:9px 12px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--text);font-family:inherit;outline:none;">
         </div>
@@ -519,26 +519,26 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
             <code style="display:block;margin:6px 0;padding:8px;background:var(--bg);border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;">create table if not exists english_app (
   user_id text primary key,
   dico jsonb, phrases jsonb,
-  pro jsonb, history jsonb,
+  pro jsonb, dict_history jsonb,
   updated_at timestamptz default now()
 );
 alter table english_app enable row level security;
-create policy "open" on english_app for all using (true);</code>
+create policy "public access" on english_app for all using (true);</code>
             <strong>3.</strong> Settings → API → copiez <em>Project URL</em> et <em>anon public</em>
           </div>
         </details>
       </div>
-      <div id="supabase-connected" style="display:none;">
+      <div id="supabase-connected">
         <div class="modal-row">
           <div>
             <div class="modal-label">Sync automatique active</div>
-            <div class="modal-sublabel" id="sb-project-url-display"></div>
+            <div class="modal-sublabel" id="sb-project-url-display">nibejtyghkbcgklzepoh.supabase.co</div>
           </div>
           <button class="modal-btn" onclick="syncNow()" id="btn-sync-now">🔄 Sync</button>
         </div>
         <div class="modal-row" style="margin-top:4px;">
-          <div class="modal-label" style="color:var(--text3);font-size:12px;">Déconnecter Supabase</div>
-          <button class="modal-btn danger" style="font-size:12px;padding:6px 12px;" onclick="disconnectSupabase()">Déconnecter</button>
+          <div class="modal-label" style="color:var(--text3);font-size:12px;">Changer de compte Supabase</div>
+          <button class="modal-btn danger" style="font-size:12px;padding:6px 12px;" onclick="disconnectSupabase()">Changer</button>
         </div>
       </div>
     </div>
@@ -1122,15 +1122,18 @@ const LS_SB_KEY = 'eng_sb_key';
 const LS_SB_UID = 'eng_sb_uid';
 const LS_SB_LAST = 'eng_sb_last';
 const SB_TABLE = 'english_app';
-let sbUrl = '', sbKey = '', sbUid = '';
+let sbUrl = 'https://nibejtyghkbcgklzepoh.supabase.co', sbKey = 'sb_publishable_xLBQBNWUZ93lm1AhW2otyA_L5e0I-Ac', sbUid = '';
 let syncTimer = null;
 let syncPending = false;
 
 function loadSupabaseConfig() {
-  sbUrl = localStorage.getItem(LS_SB_URL) || '';
-  sbKey = localStorage.getItem(LS_SB_KEY) || '';
+  sbUrl = localStorage.getItem(LS_SB_URL) || 'https://nibejtyghkbcgklzepoh.supabase.co';
+  sbKey = localStorage.getItem(LS_SB_KEY) || 'sb_publishable_xLBQBNWUZ93lm1AhW2otyA_L5e0I-Ac';
   sbUid = localStorage.getItem(LS_SB_UID) || '';
   if (!sbUid) { sbUid = 'user_' + Math.random().toString(36).slice(2, 10); localStorage.setItem(LS_SB_UID, sbUid); }
+  // Persist defaults so they survive
+  if (!localStorage.getItem(LS_SB_URL)) localStorage.setItem(LS_SB_URL, sbUrl);
+  if (!localStorage.getItem(LS_SB_KEY)) localStorage.setItem(LS_SB_KEY, sbKey);
 }
 
 function sbHeaders() {
@@ -1187,7 +1190,7 @@ async function syncToCloud() {
       dico: JSON.stringify(dicoData.filter(e => e.custom)),        // only custom additions
       phrases: JSON.stringify(phraseData.filter(e => e.custom)),
       pro: JSON.stringify(proData),
-      history: JSON.stringify(dictHistory),
+      dict_history: JSON.stringify(dictHistory),
       updated_at: new Date().toISOString()
     };
     const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`, {
@@ -1238,7 +1241,7 @@ async function syncFromCloud() {
         }
       });
     }
-    if (row.history) { dictHistory = JSON.parse(row.history); }
+    if (row.dict_history) { dictHistory = JSON.parse(row.dict_history); }
     if (changed) { saveData(); saveProData(); renderDico(); renderPhrases(); renderPro(); }
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     localStorage.setItem(LS_SB_LAST, now);
@@ -1297,16 +1300,11 @@ function openSettings() {
   document.getElementById('stats-dico').textContent = dicoData.length;
   document.getElementById('stats-phrase').textContent = phraseData.length;
   document.getElementById('stats-custom').textContent = custom;
-  // Show/hide Supabase config vs connected state
-  if (sbUrl && sbKey) {
-    showSupabaseConnected();
-    const lastSync = localStorage.getItem(LS_SB_LAST);
-    setSyncStatus('ok', lastSync || '');
-  } else {
-    document.getElementById('supabase-config-wrap').style.display = 'block';
-    document.getElementById('supabase-connected').style.display = 'none';
-    setSyncStatus('off');
-  }
+  // Always show connected (credentials are hardcoded)
+  document.getElementById('supabase-config-wrap').style.display = 'none';
+  document.getElementById('supabase-connected').style.display = 'block';
+  const lastSync = localStorage.getItem(LS_SB_LAST);
+  setSyncStatus(sbUrl && sbKey ? 'ok' : 'off', lastSync || '');
 }
 function closeSettings(e) {
   if (!e || e.target === document.getElementById('settings-modal'))
