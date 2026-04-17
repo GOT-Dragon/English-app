@@ -1289,13 +1289,13 @@ const LS_SB_UID = 'eng_sb_uid';
 const FIXED_UID = 'got_dragon_main'; // même ID sur tous les appareils
 const LS_SB_LAST = 'eng_sb_last';
 const SB_TABLE = 'english_app';
-let sbUrl = 'https://nibejtyghkbcgklzepoh.supabase.co', sbKey = 'sb_publishable_xLBQBNWUZ93lm1AhW2otyA_L5e0I-Ac', sbUid = '';
+let sbUrl = 'https://nibejtyghkbcgklzepoh.supabase.co', sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pYmVqdHlnaGtiY2drbHplcG9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTE1NjIsImV4cCI6MjA5MTg2NzU2Mn0.eD7Psh4KaJrA7xeigMARA8v-CsAOQ8z4X9v0A02LfaA', sbUid = '';
 let syncTimer = null;
 let syncPending = false;
 
 function loadSupabaseConfig() {
   sbUrl = localStorage.getItem(LS_SB_URL) || 'https://nibejtyghkbcgklzepoh.supabase.co';
-  sbKey = localStorage.getItem(LS_SB_KEY) || 'sb_publishable_xLBQBNWUZ93lm1AhW2otyA_L5e0I-Ac';
+  sbKey = localStorage.getItem(LS_SB_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pYmVqdHlnaGtiY2drbHplcG9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTE1NjIsImV4cCI6MjA5MTg2NzU2Mn0.eD7Psh4KaJrA7xeigMARA8v-CsAOQ8z4X9v0A02LfaA';
   sbUid = FIXED_UID;
   localStorage.setItem(LS_SB_UID, sbUid);
   // Persist defaults so they survive
