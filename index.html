@@ -217,7 +217,25 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .history-chip { padding:4px 10px; border-radius:14px; border:0.5px solid var(--border); background:var(--surface); font-size:12px; cursor:pointer; color:var(--text2); }
 .history-chip:active { background:var(--surface2); }
 
-/* SETTINGS MODAL */
+/* EDIT MODAL */
+.edit-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:center; justify-content:center; padding:20px; }
+.edit-overlay.open { display:flex; }
+.edit-box { background:var(--surface); border-radius:var(--radius-lg); width:100%; max-width:420px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
+.edit-box-header { padding:14px 16px; background:var(--blue-light); display:flex; align-items:center; justify-content:space-between; }
+.edit-box-header h3 { font-size:15px; font-weight:600; color:var(--blue); }
+.edit-box-close { width:28px; height:28px; border-radius:50%; border:none; background:rgba(24,95,165,0.15); color:var(--blue); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.edit-box-body { padding:16px; }
+.edit-field { margin-bottom:10px; }
+.edit-field label { font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:4px; }
+.edit-field input, .edit-field textarea { width:100%; padding:9px 12px; border-radius:var(--radius); border:0.5px solid var(--border); background:var(--surface2); font-size:14px; color:var(--text); font-family:inherit; outline:none; }
+.edit-field input:focus, .edit-field textarea:focus { border-color:var(--blue); background:var(--surface); }
+.edit-actions { display:flex; gap:8px; padding:0 16px 16px; }
+.edit-actions .btn-primary { flex:1; }
+.edit-del-btn { padding:10px 14px; border-radius:var(--radius); border:0.5px solid rgba(163,45,45,0.4); background:transparent; color:#A32D2D; font-size:13px; cursor:pointer; font-family:inherit; }
+.edit-del-btn:active { background:#FCEBEB; }
+/* SOUND */
+.sound-btn { background:none; border:none; cursor:pointer; font-size:15px; padding:2px 4px; color:var(--text3); flex-shrink:0; }
+.sound-btn:active { color:var(--blue); }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: none; align-items: flex-end; }
 .modal-overlay.open { display: flex; }
 .modal { background: var(--surface); border-radius: 20px 20px 0 0; width: 100%; max-width: 680px; margin: 0 auto; padding: 0 0 env(safe-area-inset-bottom, 20px); max-height: 90vh; overflow-y: auto; }
@@ -522,6 +540,38 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   </nav>
 </div>
 
+<!-- EDIT MODAL -->
+<div class="edit-overlay" id="edit-modal">
+  <div class="edit-box">
+    <div class="edit-box-header">
+      <h3 id="edit-modal-title">Modifier</h3>
+      <button class="edit-box-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="edit-box-body">
+      <div class="edit-field" id="edit-field-word">
+        <label>Mot anglais</label>
+        <input id="edit-word" placeholder="Mot en anglais">
+      </div>
+      <div class="edit-field" id="edit-field-trans">
+        <label>Traduction française</label>
+        <input id="edit-trans" placeholder="Traduction">
+      </div>
+      <div class="edit-field" id="edit-field-en" style="display:none;">
+        <label>Phrase en anglais</label>
+        <textarea id="edit-en" rows="2"></textarea>
+      </div>
+      <div class="edit-field" id="edit-field-fr" style="display:none;">
+        <label>Traduction française</label>
+        <textarea id="edit-fr" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="edit-actions">
+      <button class="edit-del-btn" onclick="deleteEditItem()">🗑 Supprimer</button>
+      <button class="btn-primary" onclick="saveEditItem()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settings-modal" onclick="closeSettings(event)">
   <div class="modal">
@@ -781,13 +831,29 @@ function renderDico() {
   document.getElementById('dico-count').textContent=d.length;
   document.getElementById('dico-pn').textContent=dicoPage;
   document.getElementById('dico-pt').textContent=tp;
-  document.getElementById('dico-grid').innerHTML=items.map(e=>`
-    <div class="flip-card" onclick="this.classList.toggle('flipped')">
+  document.getElementById('dico-grid').innerHTML=items.map((e,i)=>{
+    const globalIdx = dicoData.indexOf(e);
+    const we = e.word.replace(/'/g,"\\'");
+    const te = e.trans.replace(/'/g,"\\'");
+    return `<div class="flip-card" onclick="this.classList.toggle('flipped')">
       <div class="flip-inner">
-        <div class="flip-front"><span class="flip-word">${e.word}</span><span class="flip-hint">appuyer pour voir</span></div>
-        <div class="flip-back"><span class="flip-trans">${e.trans}</span></div>
+        <div class="flip-front">
+          <span class="flip-word">${e.word}</span>
+          <span class="flip-hint">appuyer pour voir</span>
+          <div style="display:flex;gap:4px;position:absolute;bottom:6px;right:6px;" onclick="event.stopPropagation()">
+            <button class="sound-btn" onclick="speak('${we}','en')" title="Écouter">🔊</button>
+            ${e.custom ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
+          </div>
+        </div>
+        <div class="flip-back">
+          <span class="flip-trans">${e.trans}</span>
+          <div style="position:absolute;bottom:6px;right:6px;" onclick="event.stopPropagation()">
+            <button class="sound-btn" onclick="speak('${te}','fr')" title="Écouter en français">🔊</button>
+          </div>
+        </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   renderPages('dico-pages',dicoPage,tp,p=>{dicoPage=p;renderDico();});
 }
 function setDL(l){dicoLetter=l;dicoPage=1;renderDico();}
@@ -819,13 +885,24 @@ function renderPhrases() {
   phrasePage=Math.min(phrasePage,tp);
   const items=d.slice((phrasePage-1)*PER,phrasePage*PER);
   document.getElementById('phrase-count').textContent=d.length;
-  document.getElementById('phrase-grid').innerHTML=items.map(e=>`
-    <div class="phrase-card" onclick="this.classList.toggle('revealed')">
-      <div class="phrase-word">${e.word}</div>
+  document.getElementById('phrase-grid').innerHTML=items.map(e=>{
+    const globalIdx = phraseData.indexOf(e);
+    const we = e.word.replace(/'/g,"\\'");
+    const ee = e.en.replace(/'/g,"\\'");
+    const fe = (e.fr||'').replace(/'/g,"\\'");
+    return `<div class="phrase-card" onclick="this.classList.toggle('revealed')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+        <div class="phrase-word">${e.word}</div>
+        <div style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
+          <button class="sound-btn" onclick="speak('${ee}','en')" title="Écouter">🔊</button>
+          ${e.custom ? `<button class="sound-btn" onclick="openEditPhrase(${globalIdx},'${we}','${ee}','${fe}')" title="Modifier">✏️</button>` : ''}
+        </div>
+      </div>
       <div class="phrase-en">${e.en}</div>
       <div class="phrase-fr">${e.fr||'<em style="color:var(--text3)">Pas de traduction</em>'}</div>
       <div class="reveal-hint">appuyez pour révéler la traduction</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   renderPages('phrase-pages',phrasePage,tp,p=>{phrasePage=p;renderPhrases();});
 }
 function setPL(l){phraseLetter=l;phrasePage=1;renderPhrases();}
@@ -1255,16 +1332,108 @@ function useAlt(text) {
 }
 
 function addFromTrad(engWord, frWord) {
+  // engWord = mot anglais, frWord = traduction française — toujours dans ce sens pour le dico
+  if (!engWord || !frWord || engWord === frWord) {
+    showToast('Traduction manquante, impossible d\'ajouter');
+    return;
+  }
   dicoData.unshift({ word: engWord, trans: frWord, custom: true });
   saveData();
   scheduleSyncToCloud();
   showToast(`"${engWord}" ajouté au dico !`);
-  // Remove the add bar
   const bar = document.querySelector('.trad-add-bar');
-  if (bar) {
-    bar.innerHTML = `<span style="color:var(--green);">✓ <strong>${engWord}</strong> ajouté à votre dico</span>`;
-  }
+  if (bar) bar.innerHTML = `<span style="color:var(--green);">✓ <strong>${engWord}</strong> → ${frWord} ajouté</span>`;
 }
+
+// ═══════════════════════════════════════════
+// SOUND — Web Speech API
+// ═══════════════════════════════════════════
+function speak(text, lang) {
+  if (!window.speechSynthesis) { showToast('Son non supporté sur cet appareil'); return; }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang === 'en' ? 'en-GB' : 'fr-FR';
+  u.rate = 0.9;
+  window.speechSynthesis.speak(u);
+}
+
+// ═══════════════════════════════════════════
+// EDIT / DELETE MODAL
+// ═══════════════════════════════════════════
+let editMode = ''; // 'dico' or 'phrase'
+let editIdx = -1;
+
+function openEditDico(idx, word, trans) {
+  editMode = 'dico'; editIdx = idx;
+  document.getElementById('edit-modal-title').textContent = 'Modifier le mot';
+  document.getElementById('edit-field-word').style.display = 'block';
+  document.getElementById('edit-field-trans').style.display = 'block';
+  document.getElementById('edit-field-en').style.display = 'none';
+  document.getElementById('edit-field-fr').style.display = 'none';
+  document.getElementById('edit-word').value = word;
+  document.getElementById('edit-trans').value = trans;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function openEditPhrase(idx, word, en, fr) {
+  editMode = 'phrase'; editIdx = idx;
+  document.getElementById('edit-modal-title').textContent = 'Modifier la phrase';
+  document.getElementById('edit-field-word').style.display = 'block';
+  document.getElementById('edit-field-trans').style.display = 'none';
+  document.getElementById('edit-field-en').style.display = 'block';
+  document.getElementById('edit-field-fr').style.display = 'block';
+  document.getElementById('edit-word').value = word;
+  document.getElementById('edit-en').value = en;
+  document.getElementById('edit-fr').value = fr;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+function saveEditItem() {
+  if (editMode === 'dico') {
+    const w = document.getElementById('edit-word').value.trim();
+    const t = document.getElementById('edit-trans').value.trim();
+    if (!w || !t) { showToast('Remplissez les deux champs'); return; }
+    dicoData[editIdx].word = w;
+    dicoData[editIdx].trans = t;
+    saveData(); scheduleSyncToCloud(); renderDico();
+    showToast('Mot modifié !');
+  } else {
+    const w = document.getElementById('edit-word').value.trim();
+    const en = document.getElementById('edit-en').value.trim();
+    const fr = document.getElementById('edit-fr').value.trim();
+    if (!w || !en) { showToast('Remplissez les champs obligatoires'); return; }
+    phraseData[editIdx].word = w;
+    phraseData[editIdx].en = en;
+    phraseData[editIdx].fr = fr;
+    saveData(); scheduleSyncToCloud(); renderPhrases();
+    showToast('Phrase modifiée !');
+  }
+  closeEditModal();
+}
+
+function deleteEditItem() {
+  const label = editMode === 'dico' ? 'ce mot' : 'cette phrase';
+  if (!confirm(`Supprimer ${label} ?`)) return;
+  if (editMode === 'dico') {
+    dicoData.splice(editIdx, 1);
+    saveData(); scheduleSyncToCloud(); renderDico();
+    showToast('Mot supprimé');
+  } else {
+    phraseData.splice(editIdx, 1);
+    saveData(); scheduleSyncToCloud(); renderPhrases();
+    showToast('Phrase supprimée');
+  }
+  closeEditModal();
+}
+
+// Close edit modal on overlay click
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
 
 function renderTradHist() {
   const el = document.getElementById('trad-hist');
