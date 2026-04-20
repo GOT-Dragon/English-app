@@ -1252,7 +1252,6 @@ async function translate() {
     if (tradHistory.length > 12) tradHistory.pop();
     localStorage.setItem('eng_trad_hist', JSON.stringify(tradHistory));
     renderTradHist();
-initSplash();
   }
 
   try {
@@ -1906,6 +1905,7 @@ renderPhrases();
 renderPro();
 initQuiz();
 renderTradHist();
+initSplash();
 
 // Pull from cloud on startup (silent, after render)
 if (sbUrl && sbKey) {
