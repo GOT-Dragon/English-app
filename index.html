@@ -217,6 +217,26 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .history-chip { padding:4px 10px; border-radius:14px; border:0.5px solid var(--border); background:var(--surface); font-size:12px; cursor:pointer; color:var(--text2); }
 .history-chip:active { background:var(--surface2); }
 
+/* CORRECTION IA */
+.correct-card { background:var(--surface); border-radius:var(--radius-lg); border:0.5px solid var(--border); overflow:hidden; margin-bottom:10px; }
+.correct-section { padding:14px 16px; border-bottom:0.5px solid var(--border); }
+.correct-section:last-child { border-bottom:none; }
+.correct-section-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
+.correct-fixed-wrap { background:var(--green-light); border-radius:var(--radius); padding:12px 14px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.correct-fixed { font-size:15px; font-weight:600; color:var(--green); line-height:1.6; flex:1; }
+.correct-error { padding:8px 0; border-bottom:0.5px solid var(--border); font-size:13px; line-height:1.5; }
+.correct-error:last-child { border-bottom:none; }
+.correct-error-word { color:#A32D2D; font-weight:600; text-decoration:line-through; }
+.correct-error-fix { color:var(--green); font-weight:600; }
+.correct-error-reason { color:var(--text2); font-size:12px; margin-top:2px; }
+.correct-alt { padding:8px 12px; background:var(--surface2); border-radius:var(--radius); margin-bottom:6px; font-size:13px; color:var(--text); line-height:1.5; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.correct-alt-text { flex:1; }
+.correct-score { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; margin-bottom:12px; }
+.score-perfect { background:var(--green-light); color:var(--green); }
+.score-good { background:#EAF3DE; color:#3B6D11; }
+.score-ok { background:var(--amber-light); color:var(--amber); }
+.score-bad { background:#FCEBEB; color:#A32D2D; }
+
 /* EDIT MODAL */
 .edit-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:center; justify-content:center; padding:20px; }
 .edit-overlay.open { display:flex; }
@@ -563,30 +583,47 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
     <!-- TRADUCTEUR -->
     <div class="section" id="s-dict">
 
-      <!-- Barre de langue -->
-      <div class="trad-lang-bar">
-        <button class="trad-lang-btn active" id="btn-lang-en" onclick="setLang('en')">🇬🇧 Anglais</button>
-        <button class="trad-swap" onclick="swapLang()" title="Inverser">⇄</button>
-        <button class="trad-lang-btn" id="btn-lang-fr" onclick="setLang('fr')">🇫🇷 Français</button>
+      <!-- Mode tabs -->
+      <div class="sub-tabs" style="margin-bottom:14px;">
+        <button class="sub-tab active" id="tab-trad" onclick="setDictMode('trad',this)">🌐 Traduire</button>
+        <button class="sub-tab" id="tab-correct" onclick="setDictMode('correct',this)">✍️ Corriger mon anglais</button>
       </div>
 
-      <!-- Zone de saisie -->
-      <div class="trad-input-wrap">
-        <textarea class="trad-textarea" id="trad-input"
-          placeholder="Entrez un mot ou une phrase..."
-          oninput="onTradInput()"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();translate();}"></textarea>
-        <button class="trad-clear" id="trad-clear-btn" onclick="clearTrad()">✕</button>
+      <!-- MODE TRADUCTION -->
+      <div id="mode-trad">
+        <!-- Barre de langue -->
+        <div class="trad-lang-bar">
+          <button class="trad-lang-btn active" id="btn-lang-en" onclick="setLang('en')">🇬🇧 Anglais</button>
+          <button class="trad-swap" onclick="swapLang()" title="Inverser">⇄</button>
+          <button class="trad-lang-btn" id="btn-lang-fr" onclick="setLang('fr')">🇫🇷 Français</button>
+        </div>
+        <div class="trad-input-wrap">
+          <textarea class="trad-textarea" id="trad-input"
+            placeholder="Entrez un mot ou une phrase..."
+            oninput="onTradInput()"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();translate();}"></textarea>
+          <button class="trad-clear" id="trad-clear-btn" onclick="clearTrad()">✕</button>
+        </div>
+        <button class="btn-primary" onclick="translate()" style="width:100%;margin-bottom:14px;">Traduire</button>
+        <div id="trad-result"></div>
+        <div style="margin-top:4px;">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Recherches récentes</div>
+          <div class="trad-history" id="trad-hist"></div>
+        </div>
       </div>
-      <button class="btn-primary" onclick="translate()" style="width:100%;margin-bottom:14px;">Traduire</button>
 
-      <!-- Résultat -->
-      <div id="trad-result"></div>
-
-      <!-- Historique -->
-      <div style="margin-top:4px;">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Recherches récentes</div>
-        <div class="trad-history" id="trad-hist"></div>
+      <!-- MODE CORRECTION -->
+      <div id="mode-correct" style="display:none;">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Écrivez votre phrase en anglais — l'IA la corrige, explique les erreurs et propose des alternatives.</p>
+        <div class="trad-input-wrap">
+          <textarea class="trad-textarea" id="correct-input"
+            placeholder="Ex: I have went to the store yesterday and buyed some food..."
+            style="min-height:110px;"
+            oninput="document.getElementById('correct-clear').classList.toggle('visible',this.value.length>0)"></textarea>
+          <button class="trad-clear" id="correct-clear" onclick="document.getElementById('correct-input').value='';this.classList.remove('visible');document.getElementById('correct-result').innerHTML=''">✕</button>
+        </div>
+        <button class="btn-primary" onclick="correctEnglish()" style="width:100%;margin-bottom:14px;">✍️ Corriger avec l'IA</button>
+        <div id="correct-result"></div>
       </div>
 
     </div>
@@ -1520,6 +1557,150 @@ function renderTradHist() {
 // Legacy stubs (kept for Supabase sync compatibility)
 function searchDict() { translate(); }
 function renderDictHist() { renderTradHist(); }
+
+// ═══════════════════════════════════════════
+// MODE SWITCH TRADUCTION / CORRECTION
+// ═══════════════════════════════════════════
+function setDictMode(mode, btn) {
+  document.querySelectorAll('#s-dict .sub-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('mode-trad').style.display = mode === 'trad' ? 'block' : 'none';
+  document.getElementById('mode-correct').style.display = mode === 'correct' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════
+// CORRECTION IA (Claude API)
+// ═══════════════════════════════════════════
+async function correctEnglish() {
+  const text = document.getElementById('correct-input').value.trim();
+  if (!text) { showToast('Entrez une phrase à corriger'); return; }
+  const el = document.getElementById('correct-result');
+  el.innerHTML = `<div class="correct-loading">✍️ Analyse en cours...</div>`;
+
+  try {
+    const prompt = `You are an expert English teacher helping a French speaker improve their English writing.
+
+Analyze this English text written by a French learner:
+"${text}"
+
+Respond ONLY with a valid JSON object, no markdown, no explanation outside the JSON:
+{
+  "score": <number 0-100 representing quality>,
+  "corrected": "<the fully corrected version>",
+  "errors": [
+    {
+      "original": "<wrong word or phrase>",
+      "fixed": "<correct version>",
+      "reason": "<short explanation in French, max 10 words>"
+    }
+  ],
+  "alternatives": [
+    "<alternative way to express the same idea, in English>",
+    "<another alternative>"
+  ],
+  "tip": "<one short learning tip in French, max 15 words>"
+}
+
+Rules:
+- If the text is already perfect, errors array should be empty and score should be 100
+- Maximum 4 errors, 3 alternatives
+- Keep explanations very concise
+- alternatives should be natural English phrasings`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+
+    // Score badge
+    const score = result.score || 0;
+    const scoreClass = score === 100 ? 'score-perfect' : score >= 75 ? 'score-good' : score >= 50 ? 'score-ok' : 'score-bad';
+    const scoreEmoji = score === 100 ? '🎉' : score >= 75 ? '👍' : score >= 50 ? '💪' : '🔧';
+    const scoreLabel = score === 100 ? 'Parfait !' : score >= 75 ? 'Très bien' : score >= 50 ? 'Pas mal' : 'À améliorer';
+
+    const correctedEsc = result.corrected.replace(/'/g, "\\'");
+
+    let h = `<div class="correct-card">`;
+
+    // Score + version corrigée
+    h += `<div class="correct-section">
+      <div class="correct-score ${scoreClass}">${scoreEmoji} ${score}/100 — ${scoreLabel}</div>
+      <div class="correct-section-label" style="color:var(--green);">Version corrigée</div>
+      <div class="correct-fixed-wrap">
+        <div class="correct-fixed">${result.corrected}</div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="sound-btn" onclick="speak('${correctedEsc}','en')" title="Écouter">🔊</button>
+          <button class="copy-btn" onclick="copyTrad(this,'${correctedEsc}')">Copier</button>
+        </div>
+      </div>
+    </div>`;
+
+    // Erreurs détaillées
+    if (result.errors && result.errors.length > 0) {
+      h += `<div class="correct-section">
+        <div class="correct-section-label" style="color:#A32D2D;">Erreurs (${result.errors.length})</div>`;
+      result.errors.forEach(e => {
+        h += `<div class="correct-error">
+          <span class="correct-error-word">${e.original}</span>
+          → <span class="correct-error-fix">${e.fixed}</span>
+          <div class="correct-error-reason">${e.reason}</div>
+        </div>`;
+      });
+      h += `</div>`;
+    } else {
+      h += `<div class="correct-section" style="background:var(--green-light);">
+        <div style="font-size:13px;color:var(--green);">✓ Aucune erreur — votre anglais est excellent ici !</div>
+      </div>`;
+    }
+
+    // Alternatives
+    if (result.alternatives && result.alternatives.length > 0) {
+      h += `<div class="correct-section">
+        <div class="correct-section-label" style="color:var(--blue);">Façons alternatives de le dire</div>`;
+      result.alternatives.forEach(alt => {
+        const ae = alt.replace(/'/g, "\\'");
+        h += `<div class="correct-alt">
+          <span class="correct-alt-text">${alt}</span>
+          <div style="display:flex;gap:5px;">
+            <button class="sound-btn" onclick="speak('${ae}','en')">🔊</button>
+            <button class="copy-btn" onclick="copyTrad(this,'${ae}')">Copier</button>
+          </div>
+        </div>`;
+      });
+      h += `</div>`;
+    }
+
+    // Tip
+    if (result.tip) {
+      h += `<div class="correct-section" style="background:var(--blue-light);">
+        <div class="correct-section-label" style="color:var(--blue);">Conseil</div>
+        <div style="font-size:13px;color:var(--blue);line-height:1.5;">💡 ${result.tip}</div>
+      </div>`;
+    }
+
+    h += `</div>`;
+    el.innerHTML = h;
+
+  } catch(err) {
+    if (!navigator.onLine) {
+      el.innerHTML = `<div class="trad-error">Hors ligne — la correction nécessite une connexion internet.</div>`;
+    } else {
+      el.innerHTML = `<div class="trad-error">Erreur lors de la correction. Réessayez.</div>`;
+      console.error('Correction error:', err);
+    }
+  }
+}
 
 // ═══════════════════════════════════════════
 // SUPABASE SYNC
