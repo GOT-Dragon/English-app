@@ -432,7 +432,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         </div>
         <div class="add-form" id="phrase-form">
           <div class="form-field"><input id="new-pw" placeholder="Mot / expression anglais"></div>
-          <div class="form-field"><input id="new-pen" placeholder="Phrase en anglais"></div>
+          <div class="form-field"><input id="new-pen" placeholder="Phrase en anglais (optionnel, à compléter plus tard)"></div>
           <div class="form-field"><input id="new-pfr" placeholder="Traduction française (optionnel)"></div>
           <div class="form-actions">
             <button class="btn-primary" onclick="addPhraseEntry()">Enregistrer</button>
@@ -750,6 +750,8 @@ create policy "public access" on english_app for all using (true);</code>
       </div>
     </div>
 
+
+
     <!-- EXPORT MANUEL (backup) -->
     <div class="modal-section">
       <h3>Sauvegarde manuelle</h3>
@@ -954,8 +956,9 @@ function renderDico() {
         </div>
         <div class="flip-back">
           <span class="flip-trans">${e.trans}</span>
-          <div style="position:absolute;bottom:6px;right:6px;" onclick="event.stopPropagation()">
+          <div style="position:absolute;bottom:6px;right:6px;display:flex;gap:3px;" onclick="event.stopPropagation()">
             <button class="sound-btn" onclick="speak('${te}','fr')" title="Écouter en français">🔊</button>
+            <button class="sound-btn" title="Ajouter à Pratique" onclick="addDicoToPratique('${we}','${te}')">📝</button>
           </div>
         </div>
       </div>
@@ -979,8 +982,24 @@ function addDicoEntry(){
   showToast('Mot ajouté !');
 }
 
-// ═══════════════════════════════════════════
-// PHRASES
+function addDicoToPratique(word, trans) {
+  // Vérifie si déjà dans pratique
+  const exists = phraseData.find(p => p.word.toLowerCase() === word.toLowerCase());
+  if (exists) { showToast(`"${word}" est déjà dans Pratique`); return; }
+  // Ajoute avec phrase vide — à compléter plus tard
+  phraseData.unshift({ word, en: '', fr: trans, custom: true });
+  saveData();
+  scheduleSyncToCloud();
+  showToast(`"${word}" ajouté à Pratique — complétez la phrase !`);
+  // Bascule sur l'onglet Pratique pour éditer
+  const pratBtn = document.querySelector('#s-vocab .sub-tab:nth-child(2)');
+  if (pratBtn) pratBtn.click();
+  // Ouvre directement le modal d'édition
+  setTimeout(() => {
+    const idx = phraseData.findIndex(p => p.word.toLowerCase() === word.toLowerCase() && p.custom);
+    if (idx >= 0) openEditPhrase(idx, word, '', trans);
+  }, 200);
+}
 // ═══════════════════════════════════════════
 function renderPhrases() {
   let d=phraseData;
@@ -1002,12 +1021,14 @@ function renderPhrases() {
         <div class="phrase-word">${e.word}</div>
         <div style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
           <button class="sound-btn" onclick="speak('${ee}','en')" title="Écouter">🔊</button>
+          ${e.custom ? `<button class="sound-btn" title="Corriger avec l'IA" onclick="correctPhraseInline(this,'${ee}')">🔧</button>` : ''}
           ${e.custom ? `<button class="sound-btn" onclick="openEditPhrase(${globalIdx},'${we}','${ee}','${fe}')" title="Modifier">✏️</button>` : ''}
         </div>
       </div>
       <div class="phrase-en">${e.en}</div>
       <div class="phrase-fr">${e.fr||'<em style="color:var(--text3)">Pas de traduction</em>'}</div>
       <div class="reveal-hint">appuyez pour révéler la traduction</div>
+      <div class="phrase-correct-result" style="display:none;margin-top:8px;"></div>
     </div>`;
   }).join('');
   renderPages('phrase-pages',phrasePage,tp,p=>{phrasePage=p;renderPhrases();});
@@ -1018,8 +1039,8 @@ function addPhraseEntry(){
   const w=document.getElementById('new-pw').value.trim();
   const en=document.getElementById('new-pen').value.trim();
   const fr=document.getElementById('new-pfr').value.trim();
-  if(!w||!en){showToast('Remplissez au moins les deux premiers champs');return;}
-  phraseData.unshift({word:w,en,fr,custom:true});
+  if(!w){showToast('Entrez au moins le mot ou l\'expression');return;}
+  phraseData.unshift({word:w,en:en,fr:fr,custom:true});
   saveData();
   scheduleSyncToCloud();
   document.getElementById('new-pw').value='';
@@ -1514,7 +1535,7 @@ function saveEditItem() {
     const w = document.getElementById('edit-word').value.trim();
     const en = document.getElementById('edit-en').value.trim();
     const fr = document.getElementById('edit-fr').value.trim();
-    if (!w || !en) { showToast('Remplissez les champs obligatoires'); return; }
+    if (!w) { showToast('Le mot est obligatoire'); return; }
     phraseData[editIdx].word = w;
     phraseData[editIdx].en = en;
     phraseData[editIdx].fr = fr;
@@ -1569,141 +1590,118 @@ function setDictMode(mode, btn) {
 }
 
 // ═══════════════════════════════════════════
-// CORRECTION IA (Claude API)
+// CORRECTION — Supabase Edge Function (gratuit, sans clé)
 // ═══════════════════════════════════════════
+const CORRECT_URL = 'https://nibejtyghkbcgklzepoh.supabase.co/functions/v1/smooth-handler';
+
 async function correctEnglish() {
   const text = document.getElementById('correct-input').value.trim();
   if (!text) { showToast('Entrez une phrase à corriger'); return; }
   const el = document.getElementById('correct-result');
   el.innerHTML = `<div class="correct-loading">✍️ Analyse en cours...</div>`;
-
   try {
-    const prompt = `You are an expert English teacher helping a French speaker improve their English writing.
-
-Analyze this English text written by a French learner:
-"${text}"
-
-Respond ONLY with a valid JSON object, no markdown, no explanation outside the JSON:
-{
-  "score": <number 0-100 representing quality>,
-  "corrected": "<the fully corrected version>",
-  "errors": [
-    {
-      "original": "<wrong word or phrase>",
-      "fixed": "<correct version>",
-      "reason": "<short explanation in French, max 10 words>"
-    }
-  ],
-  "alternatives": [
-    "<alternative way to express the same idea, in English>",
-    "<another alternative>"
-  ],
-  "tip": "<one short learning tip in French, max 15 words>"
+    const res = await fetch(CORRECT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sbKey },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error(`Erreur ${res.status}`);
+    const data = await res.json();
+    el.innerHTML = buildCorrectionHTML(text, data);
+  } catch(err) {
+    el.innerHTML = `<div class="trad-error">${err.message || 'Service indisponible. Réessayez.'}</div>`;
+    console.error('Correction error:', err);
+  }
 }
 
-Rules:
-- If the text is already perfect, errors array should be empty and score should be 100
-- Maximum 4 errors, 3 alternatives
-- Keep explanations very concise
-- alternatives should be natural English phrasings`;
-
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    if (!res.ok) throw new Error(`API error ${res.status}`);
-    const data = await res.json();
-    const raw = data.content?.[0]?.text || '';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(clean);
-
-    // Score badge
-    const score = result.score || 0;
-    const scoreClass = score === 100 ? 'score-perfect' : score >= 75 ? 'score-good' : score >= 50 ? 'score-ok' : 'score-bad';
-    const scoreEmoji = score === 100 ? '🎉' : score >= 75 ? '👍' : score >= 50 ? '💪' : '🔧';
-    const scoreLabel = score === 100 ? 'Parfait !' : score >= 75 ? 'Très bien' : score >= 50 ? 'Pas mal' : 'À améliorer';
-
-    const correctedEsc = result.corrected.replace(/'/g, "\\'");
-
-    let h = `<div class="correct-card">`;
-
-    // Score + version corrigée
-    h += `<div class="correct-section">
+function buildCorrectionHTML(original, data) {
+  const matches = data.matches || [];
+  let corrected = original;
+  const sorted = [...matches].sort((a,b) => b.offset - a.offset);
+  sorted.forEach(m => {
+    if (m.replacements?.length > 0) {
+      corrected = corrected.slice(0, m.offset) + m.replacements[0].value + corrected.slice(m.offset + m.length);
+    }
+  });
+  const score = matches.length === 0 ? 100 : Math.max(10, 100 - matches.length * 15);
+  const scoreClass = score === 100 ? 'score-perfect' : score >= 75 ? 'score-good' : score >= 50 ? 'score-ok' : 'score-bad';
+  const scoreEmoji = score === 100 ? '🎉' : score >= 75 ? '👍' : score >= 50 ? '💪' : '🔧';
+  const scoreLabel = score === 100 ? 'Parfait !' : score >= 75 ? 'Très bien' : score >= 50 ? 'Pas mal' : 'À améliorer';
+  const correctedEsc = corrected.replace(/'/g, "\\'");
+  const catFr = { TYPOS:'Faute de frappe', GRAMMAR:'Grammaire', STYLE:'Style', PUNCTUATION:'Ponctuation', CASING:'Majuscule', CONFUSED_WORDS:'Mot incorrect' };
+  let h = `<div class="correct-card">
+    <div class="correct-section">
       <div class="correct-score ${scoreClass}">${scoreEmoji} ${score}/100 — ${scoreLabel}</div>
       <div class="correct-section-label" style="color:var(--green);">Version corrigée</div>
       <div class="correct-fixed-wrap">
-        <div class="correct-fixed">${result.corrected}</div>
+        <div class="correct-fixed">${corrected}</div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button class="sound-btn" onclick="speak('${correctedEsc}','en')" title="Écouter">🔊</button>
+          <button class="sound-btn" onclick="speak('${correctedEsc}','en')">🔊</button>
           <button class="copy-btn" onclick="copyTrad(this,'${correctedEsc}')">Copier</button>
         </div>
       </div>
     </div>`;
-
-    // Erreurs détaillées
-    if (result.errors && result.errors.length > 0) {
-      h += `<div class="correct-section">
-        <div class="correct-section-label" style="color:#A32D2D;">Erreurs (${result.errors.length})</div>`;
-      result.errors.forEach(e => {
-        h += `<div class="correct-error">
-          <span class="correct-error-word">${e.original}</span>
-          → <span class="correct-error-fix">${e.fixed}</span>
-          <div class="correct-error-reason">${e.reason}</div>
-        </div>`;
-      });
-      h += `</div>`;
-    } else {
-      h += `<div class="correct-section" style="background:var(--green-light);">
-        <div style="font-size:13px;color:var(--green);">✓ Aucune erreur — votre anglais est excellent ici !</div>
+  if (matches.length > 0) {
+    h += `<div class="correct-section"><div class="correct-section-label" style="color:#A32D2D;">Erreurs (${matches.length})</div>`;
+    matches.slice(0,5).forEach(m => {
+      const wrong = original.slice(m.offset, m.offset + m.length);
+      const fix = m.replacements?.[0]?.value || '—';
+      const cat = catFr[m.rule?.category?.id] || 'Erreur';
+      const msg = (m.message || '').slice(0, 60);
+      h += `<div class="correct-error">
+        <span class="correct-error-word">${wrong}</span> → <span class="correct-error-fix">${fix}</span>
+        <div class="correct-error-reason">${cat} — ${msg}</div>
       </div>`;
-    }
-
-    // Alternatives
-    if (result.alternatives && result.alternatives.length > 0) {
-      h += `<div class="correct-section">
-        <div class="correct-section-label" style="color:var(--blue);">Façons alternatives de le dire</div>`;
-      result.alternatives.forEach(alt => {
-        const ae = alt.replace(/'/g, "\\'");
-        h += `<div class="correct-alt">
-          <span class="correct-alt-text">${alt}</span>
-          <div style="display:flex;gap:5px;">
-            <button class="sound-btn" onclick="speak('${ae}','en')">🔊</button>
-            <button class="copy-btn" onclick="copyTrad(this,'${ae}')">Copier</button>
-          </div>
-        </div>`;
-      });
-      h += `</div>`;
-    }
-
-    // Tip
-    if (result.tip) {
-      h += `<div class="correct-section" style="background:var(--blue-light);">
-        <div class="correct-section-label" style="color:var(--blue);">Conseil</div>
-        <div style="font-size:13px;color:var(--blue);line-height:1.5;">💡 ${result.tip}</div>
-      </div>`;
-    }
-
+    });
     h += `</div>`;
-    el.innerHTML = h;
-
-  } catch(err) {
-    if (!navigator.onLine) {
-      el.innerHTML = `<div class="trad-error">Hors ligne — la correction nécessite une connexion internet.</div>`;
-    } else {
-      el.innerHTML = `<div class="trad-error">Erreur lors de la correction. Réessayez.</div>`;
-      console.error('Correction error:', err);
-    }
+  } else {
+    h += `<div class="correct-section" style="background:var(--green-light);">
+      <div style="font-size:13px;color:var(--green);">✓ Aucune erreur — excellent !</div>
+    </div>`;
   }
+  const tips = { GRAMMAR:'💡 Relisez vos temps verbaux.', TYPOS:'💡 Lisez à voix haute pour repérer les fautes.', CONFUSED_WORDS:'💡 Mémorisez les paires : their/there, its/it\'s…' };
+  const tip = tips[matches[0]?.rule?.category?.id] || (matches.length === 0 ? '💡 Parfait ! Continuez à pratiquer.' : '💡 Lisez en anglais pour améliorer votre intuition.');
+  h += `<div class="correct-section" style="background:var(--blue-light);">
+    <div style="font-size:13px;color:var(--blue);line-height:1.5;">${tip}</div>
+  </div></div>`;
+  return h;
 }
-
-// ═══════════════════════════════════════════
-// SUPABASE SYNC
+// Correction inline depuis une carte phrase pratique
+async function correctPhraseInline(btn, text) {
+  if (!text) { showToast('Aucune phrase à corriger'); return; }
+  const card = btn.closest('.phrase-card');
+  const resultDiv = card.querySelector('.phrase-correct-result');
+  btn.textContent = '⏳'; btn.disabled = true;
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = `<div style="font-size:12px;color:var(--text3);">Analyse en cours...</div>`;
+  try {
+    const res = await fetch(CORRECT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sbKey },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    const matches = data.matches || [];
+    let corrected = text;
+    [...matches].sort((a,b) => b.offset - a.offset).forEach(m => {
+      if (m.replacements?.length > 0)
+        corrected = corrected.slice(0, m.offset) + m.replacements[0].value + corrected.slice(m.offset + m.length);
+    });
+    const score = matches.length === 0 ? 100 : Math.max(10, 100 - matches.length * 15);
+    const color = score === 100 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#A32D2D';
+    const corrEsc = corrected.replace(/'/g, "\'");
+    resultDiv.innerHTML = `<div style="font-size:12px;line-height:1.5;padding:6px 0;border-top:0.5px solid var(--border);margin-top:6px;">
+      <span style="color:${color};font-weight:600;">${score}/100</span>
+      ${corrected !== text
+        ? ` — <span style="color:var(--green);">${corrected}</span>
+            <button class="sound-btn" style="font-size:13px;" onclick="speak('${corrEsc}','en')">🔊</button>`
+        : ' — ✓ Parfait !'}
+    </div>`;
+  } catch(e) {
+    resultDiv.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 0;">Erreur — ${e.message}</div>`;
+  }
+  btn.textContent = '🔧'; btn.disabled = false;
+}
 // ═══════════════════════════════════════════
 const LS_SB_URL = 'eng_sb_url';
 const LS_SB_KEY = 'eng_sb_key';
@@ -1913,12 +1911,13 @@ function openSettings() {
   document.getElementById('stats-dico').textContent = dicoData.length;
   document.getElementById('stats-phrase').textContent = phraseData.length;
   document.getElementById('stats-custom').textContent = custom;
-  // Always show connected (credentials are hardcoded)
+  // Show/hide Supabase config vs connected state
   document.getElementById('supabase-config-wrap').style.display = 'none';
   document.getElementById('supabase-connected').style.display = 'block';
   const lastSync = localStorage.getItem(LS_SB_LAST);
   setSyncStatus(sbUrl && sbKey ? 'ok' : 'off', lastSync || '');
 }
+
 function closeSettings(e) {
   if (!e || e.target === document.getElementById('settings-modal'))
     document.getElementById('settings-modal').classList.remove('open');
