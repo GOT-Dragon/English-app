@@ -1650,7 +1650,19 @@ async function correctEnglish() {
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
           max_tokens: 600,
-          messages: [{ role: 'user', content: `English teacher for French speakers. Analyze: "${text}"\nReply ONLY with JSON, no markdown:\n{"score":0-100,"corrected":"...","errors":[{"original":"...","fixed":"...","reason":"...en français max 8 mots..."}],"tip":"...conseil en français max 12 mots..."}` }]
+          messages: [{ role: 'user', content: `You are an English grammar corrector. The user wrote this text in English and wants it corrected.
+
+INPUT TEXT: "${text}"
+
+Your job:
+1. Keep the corrected text IN ENGLISH (do NOT translate to French)
+2. Fix grammar, spelling, vocabulary errors
+3. Explain each error briefly IN FRENCH
+
+Reply ONLY with this exact JSON format, no markdown, no extra text:
+{"score":85,"corrected":"the corrected English text here","errors":[{"original":"wrong word","fixed":"correct word","reason":"explication courte en français"}],"tip":"conseil court en français"}
+
+IMPORTANT: "corrected" field must be in ENGLISH, only "reason" and "tip" are in French.` }]
         })
       });
       if (!res.ok) throw new Error(`Erreur Groq ${res.status}`);
@@ -1756,13 +1768,36 @@ async function correctPhraseInline(btn, text) {
   resultDiv.style.display = 'block';
   resultDiv.innerHTML = `<div style="font-size:12px;color:var(--text3);">Analyse en cours...</div>`;
   try {
-    const res = await fetch(CORRECT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-    const raw = await res.text();
-    const data = parseGroqJSON(raw) || { score: 0, corrected: text, errors: [], tip: 'Impossible de parser la réponse.' };
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    let data;
+    if (groqKey) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          max_tokens: 400,
+          messages: [{ role: 'user', content: `Correct this English text. Keep corrected text IN ENGLISH. Explain in French.
+
+INPUT: "${text}"
+
+JSON only: {"score":0-100,"corrected":"corrected English text","tip":"conseil en français max 10 mots"}
+
+IMPORTANT: corrected field must be English, NOT French.` }]
+        })
+      });
+      const d = await res.json();
+      const raw = d.choices?.[0]?.message?.content || '{}';
+      data = parseGroqJSON(raw) || { score: 0, corrected: text, tip: '' };
+    } else {
+      const res = await fetch(CORRECT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const raw = await res.text();
+      data = parseGroqJSON(raw) || { score: 0, corrected: text, tip: '' };
+    }
     let corrected = text, score = 100;
     if (data.corrected !== undefined) {
       corrected = data.corrected || text;
