@@ -750,7 +750,16 @@ create policy "public access" on english_app for all using (true);</code>
       </div>
     </div>
 
-
+    <!-- CORRECTION IA — Clé Groq -->
+    <div class="modal-section">
+      <h3>✍️ Correction IA</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Entrez votre clé Groq pour activer la correction intelligente. Gratuit sur <a href="https://console.groq.com" target="_blank" style="color:var(--blue);">console.groq.com</a> — inscription en 30 secondes, aucune carte bancaire.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input id="groq-key-input" type="password" placeholder="gsk_..." style="flex:1;padding:9px 12px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface2);font-size:13px;color:var(--text);font-family:inherit;outline:none;">
+        <button class="btn-primary" style="font-size:13px;padding:9px 14px;" onclick="saveGroqKey()">Sauver</button>
+      </div>
+      <div id="groq-key-status" style="font-size:12px;color:var(--text3);"></div>
+    </div>
 
     <!-- EXPORT MANUEL (backup) -->
     <div class="modal-section">
@@ -1592,7 +1601,7 @@ function setDictMode(mode, btn) {
 // ═══════════════════════════════════════════
 // CORRECTION — Supabase Edge Function (gratuit, sans clé)
 // ═══════════════════════════════════════════
-const CORRECT_URL = 'https://nibejtyghkbcgklzepoh.supabase.co/functions/v1/smooth-handler';
+const CORRECT_URL = 'https://nibejtyghkbcgklzepoh.supabase.co/functions/v1/smooth-handler'; // fallback
 
 async function correctEnglish() {
   const text = document.getElementById('correct-input').value.trim();
@@ -1600,14 +1609,34 @@ async function correctEnglish() {
   const el = document.getElementById('correct-result');
   el.innerHTML = `<div class="correct-loading">✍️ Analyse en cours...</div>`;
   try {
-    const res = await fetch(CORRECT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sbKey },
-      body: JSON.stringify({ text })
-    });
-    if (!res.ok) throw new Error(`Erreur ${res.status}`);
-    const raw = await res.text();
-    const data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    let data;
+    if (groqKey) {
+      // Appel direct Groq (recommandé)
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          max_tokens: 600,
+          messages: [{ role: 'user', content: `English teacher for French speakers. Analyze: "${text}"\nReply ONLY with JSON, no markdown:\n{"score":0-100,"corrected":"...","errors":[{"original":"...","fixed":"...","reason":"...en français max 8 mots..."}],"tip":"...conseil en français max 12 mots..."}` }]
+        })
+      });
+      if (!res.ok) throw new Error(`Erreur Groq ${res.status}`);
+      const d = await res.json();
+      const raw = d.choices?.[0]?.message?.content || '{}';
+      data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    } else {
+      // Fallback Supabase Edge Function
+      const res = await fetch(CORRECT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status} — ajoutez votre clé Groq dans ⚙️`);
+      const raw = await res.text();
+      data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    }
     el.innerHTML = buildCorrectionHTML(text, data);
   } catch(err) {
     el.innerHTML = `<div class="trad-error">${err.message || 'Service indisponible. Réessayez.'}</div>`;
@@ -1698,7 +1727,7 @@ async function correctPhraseInline(btn, text) {
   try {
     const res = await fetch(CORRECT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sbKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
     });
     const raw = await res.text();
@@ -1778,6 +1807,20 @@ async function saveSupabaseConfig() {
 }
 
 function showSupabaseConnected() {
+  // Groq key status
+  const groqKey = localStorage.getItem('eng_groq_key') || '';
+  const groqEl = document.getElementById('groq-key-status');
+  const groqInput = document.getElementById('groq-key-input');
+  if (groqEl) {
+    if (groqKey) {
+      groqEl.textContent = '✓ Clé configurée — correction IA active';
+      groqEl.style.color = 'var(--green)';
+      if (groqInput) groqInput.value = groqKey;
+    } else {
+      groqEl.textContent = 'Aucune clé — entrez votre clé Groq ci-dessus';
+      groqEl.style.color = 'var(--text3)';
+    }
+  }
   document.getElementById('supabase-config-wrap').style.display = 'none';
   document.getElementById('supabase-connected').style.display = 'block';
   const short = sbUrl.replace('https://','').split('.')[0];
@@ -1933,6 +1976,15 @@ function setSyncStatus(state, detail) {
 // ═══════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════
+function saveGroqKey() {
+  const key = document.getElementById('groq-key-input').value.trim();
+  if (!key) { showToast('Clé vide'); return; }
+  localStorage.setItem('eng_groq_key', key);
+  document.getElementById('groq-key-status').textContent = '✓ Clé Groq sauvegardée — correction IA active';
+  document.getElementById('groq-key-status').style.color = 'var(--green)';
+  showToast('Clé Groq sauvegardée !');
+}
+
 function openSettings() {
   document.getElementById('settings-modal').classList.add('open');
   const custom = dicoData.filter(e => e.custom).length;
