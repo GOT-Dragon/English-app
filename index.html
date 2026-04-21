@@ -1601,6 +1601,37 @@ function setDictMode(mode, btn) {
 // ═══════════════════════════════════════════
 // CORRECTION — Supabase Edge Function (gratuit, sans clé)
 // ═══════════════════════════════════════════
+// Parseur JSON robuste pour les réponses LLM
+function parseGroqJSON(raw) {
+  if (!raw) return null;
+  // Nettoyer les balises markdown
+  let clean = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  // Extraire le premier objet JSON valide
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  clean = clean.slice(start, end + 1);
+  // Nettoyer les caractères de contrôle et retours à la ligne dans les valeurs
+  clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ');
+  try {
+    return JSON.parse(clean);
+  } catch(e) {
+    // Tentative de réparation : échapper les guillemets non échappés
+    try {
+      clean = clean.replace(/(?<!\\)"/g, (m, offset, str) => {
+        // Garder les guillemets structurels, échapper les autres
+        return m;
+      });
+      // Supprimer les virgules en trop
+      clean = clean.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+      return JSON.parse(clean);
+    } catch(e2) {
+      console.warn('JSON parse failed:', e2.message, '\nRaw:', raw.slice(0, 200));
+      return null;
+    }
+  }
+}
+
 const CORRECT_URL = 'https://nibejtyghkbcgklzepoh.supabase.co/functions/v1/smooth-handler'; // fallback
 
 async function correctEnglish() {
@@ -1625,7 +1656,7 @@ async function correctEnglish() {
       if (!res.ok) throw new Error(`Erreur Groq ${res.status}`);
       const d = await res.json();
       const raw = d.choices?.[0]?.message?.content || '{}';
-      data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      data = parseGroqJSON(raw) || { score: 0, corrected: text, errors: [], tip: 'Impossible de parser la réponse.' };
     } else {
       // Fallback Supabase Edge Function
       const res = await fetch(CORRECT_URL, {
@@ -1635,7 +1666,7 @@ async function correctEnglish() {
       });
       if (!res.ok) throw new Error(`Erreur ${res.status} — ajoutez votre clé Groq dans ⚙️`);
       const raw = await res.text();
-      data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      data = parseGroqJSON(raw) || { score: 0, corrected: text, errors: [], tip: 'Impossible de parser la réponse.' };
     }
     el.innerHTML = buildCorrectionHTML(text, data);
   } catch(err) {
@@ -1731,7 +1762,7 @@ async function correctPhraseInline(btn, text) {
       body: JSON.stringify({ text })
     });
     const raw = await res.text();
-    const data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const data = parseGroqJSON(raw) || { score: 0, corrected: text, errors: [], tip: 'Impossible de parser la réponse.' };
     let corrected = text, score = 100;
     if (data.corrected !== undefined) {
       corrected = data.corrected || text;
