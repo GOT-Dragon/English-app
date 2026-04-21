@@ -1606,7 +1606,8 @@ async function correctEnglish() {
       body: JSON.stringify({ text })
     });
     if (!res.ok) throw new Error(`Erreur ${res.status}`);
-    const data = await res.json();
+    const raw = await res.text();
+    const data = JSON.parse(raw.replace(/```json|```/g, '').trim());
     el.innerHTML = buildCorrectionHTML(text, data);
   } catch(err) {
     el.innerHTML = `<div class="trad-error">${err.message || 'Service indisponible. Réessayez.'}</div>`;
@@ -1615,20 +1616,41 @@ async function correctEnglish() {
 }
 
 function buildCorrectionHTML(original, data) {
-  const matches = data.matches || [];
-  let corrected = original;
-  const sorted = [...matches].sort((a,b) => b.offset - a.offset);
-  sorted.forEach(m => {
-    if (m.replacements?.length > 0) {
-      corrected = corrected.slice(0, m.offset) + m.replacements[0].value + corrected.slice(m.offset + m.length);
-    }
-  });
-  const score = matches.length === 0 ? 100 : Math.max(10, 100 - matches.length * 15);
+  // Support both Groq format {score, corrected, errors, tip} and LanguageTool format {matches}
+  let corrected, score, errors, tip;
+
+  if (data.corrected !== undefined) {
+    // Format Groq
+    corrected = data.corrected || original;
+    score = data.score || 0;
+    errors = (data.errors || []).map(e => ({
+      wrong: e.original, fix: e.fixed, reason: e.reason
+    }));
+    tip = data.tip || '';
+  } else {
+    // Format LanguageTool (fallback)
+    const matches = data.matches || [];
+    corrected = original;
+    const sorted = [...matches].sort((a,b) => b.offset - a.offset);
+    sorted.forEach(m => {
+      if (m.replacements?.length > 0)
+        corrected = corrected.slice(0, m.offset) + m.replacements[0].value + corrected.slice(m.offset + m.length);
+    });
+    score = matches.length === 0 ? 100 : Math.max(10, 100 - matches.length * 15);
+    const catFr = { TYPOS:'Faute de frappe', GRAMMAR:'Grammaire', STYLE:'Style', PUNCTUATION:'Ponctuation', CASING:'Majuscule', CONFUSED_WORDS:'Mot incorrect' };
+    errors = matches.slice(0,5).map(m => ({
+      wrong: original.slice(m.offset, m.offset + m.length),
+      fix: m.replacements?.[0]?.value || '—',
+      reason: (catFr[m.rule?.category?.id] || 'Erreur') + ' — ' + (m.message || '').slice(0, 50)
+    }));
+    tip = '';
+  }
+
   const scoreClass = score === 100 ? 'score-perfect' : score >= 75 ? 'score-good' : score >= 50 ? 'score-ok' : 'score-bad';
   const scoreEmoji = score === 100 ? '🎉' : score >= 75 ? '👍' : score >= 50 ? '💪' : '🔧';
   const scoreLabel = score === 100 ? 'Parfait !' : score >= 75 ? 'Très bien' : score >= 50 ? 'Pas mal' : 'À améliorer';
   const correctedEsc = corrected.replace(/'/g, "\\'");
-  const catFr = { TYPOS:'Faute de frappe', GRAMMAR:'Grammaire', STYLE:'Style', PUNCTUATION:'Ponctuation', CASING:'Majuscule', CONFUSED_WORDS:'Mot incorrect' };
+
   let h = `<div class="correct-card">
     <div class="correct-section">
       <div class="correct-score ${scoreClass}">${scoreEmoji} ${score}/100 — ${scoreLabel}</div>
@@ -1641,16 +1663,13 @@ function buildCorrectionHTML(original, data) {
         </div>
       </div>
     </div>`;
-  if (matches.length > 0) {
-    h += `<div class="correct-section"><div class="correct-section-label" style="color:#A32D2D;">Erreurs (${matches.length})</div>`;
-    matches.slice(0,5).forEach(m => {
-      const wrong = original.slice(m.offset, m.offset + m.length);
-      const fix = m.replacements?.[0]?.value || '—';
-      const cat = catFr[m.rule?.category?.id] || 'Erreur';
-      const msg = (m.message || '').slice(0, 60);
+
+  if (errors.length > 0) {
+    h += `<div class="correct-section"><div class="correct-section-label" style="color:#A32D2D;">Erreurs (${errors.length})</div>`;
+    errors.forEach(e => {
       h += `<div class="correct-error">
-        <span class="correct-error-word">${wrong}</span> → <span class="correct-error-fix">${fix}</span>
-        <div class="correct-error-reason">${cat} — ${msg}</div>
+        <span class="correct-error-word">${e.wrong}</span> → <span class="correct-error-fix">${e.fix}</span>
+        <div class="correct-error-reason">${e.reason}</div>
       </div>`;
     });
     h += `</div>`;
@@ -1659,11 +1678,13 @@ function buildCorrectionHTML(original, data) {
       <div style="font-size:13px;color:var(--green);">✓ Aucune erreur — excellent !</div>
     </div>`;
   }
-  const tips = { GRAMMAR:'💡 Relisez vos temps verbaux.', TYPOS:'💡 Lisez à voix haute pour repérer les fautes.', CONFUSED_WORDS:'💡 Mémorisez les paires : their/there, its/it\'s…' };
-  const tip = tips[matches[0]?.rule?.category?.id] || (matches.length === 0 ? '💡 Parfait ! Continuez à pratiquer.' : '💡 Lisez en anglais pour améliorer votre intuition.');
-  h += `<div class="correct-section" style="background:var(--blue-light);">
-    <div style="font-size:13px;color:var(--blue);line-height:1.5;">${tip}</div>
-  </div></div>`;
+
+  if (tip) {
+    h += `<div class="correct-section" style="background:var(--blue-light);">
+      <div style="font-size:13px;color:var(--blue);line-height:1.5;">💡 ${tip}</div>
+    </div>`;
+  }
+  h += `</div>`;
   return h;
 }
 // Correction inline depuis une carte phrase pratique
@@ -1680,14 +1701,20 @@ async function correctPhraseInline(btn, text) {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sbKey },
       body: JSON.stringify({ text })
     });
-    const data = await res.json();
-    const matches = data.matches || [];
-    let corrected = text;
-    [...matches].sort((a,b) => b.offset - a.offset).forEach(m => {
-      if (m.replacements?.length > 0)
-        corrected = corrected.slice(0, m.offset) + m.replacements[0].value + corrected.slice(m.offset + m.length);
-    });
-    const score = matches.length === 0 ? 100 : Math.max(10, 100 - matches.length * 15);
+    const raw = await res.text();
+    const data = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    let corrected = text, score = 100;
+    if (data.corrected !== undefined) {
+      corrected = data.corrected || text;
+      score = data.score || 0;
+    } else {
+      const matches = data.matches || [];
+      [...matches].sort((a,b) => b.offset - a.offset).forEach(m => {
+        if (m.replacements?.length > 0)
+          corrected = corrected.slice(0, m.offset) + m.replacements[0].value + corrected.slice(m.offset + m.length);
+      });
+      score = matches.length === 0 ? 100 : Math.max(10, 100 - matches.length * 15);
+    }
     const color = score === 100 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#A32D2D';
     const corrEsc = corrected.replace(/'/g, "\'");
     resultDiv.innerHTML = `<div style="font-size:12px;line-height:1.5;padding:6px 0;border-top:0.5px solid var(--border);margin-top:6px;">
@@ -1696,6 +1723,7 @@ async function correctPhraseInline(btn, text) {
         ? ` — <span style="color:var(--green);">${corrected}</span>
             <button class="sound-btn" style="font-size:13px;" onclick="speak('${corrEsc}','en')">🔊</button>`
         : ' — ✓ Parfait !'}
+      ${data.tip ? `<div style="color:var(--text2);font-size:11px;margin-top:3px;">💡 ${data.tip}</div>` : ''}
     </div>`;
   } catch(e) {
     resultDiv.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 0;">Erreur — ${e.message}</div>`;
