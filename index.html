@@ -668,8 +668,12 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         <input id="edit-trans" placeholder="Traduction">
       </div>
       <div class="edit-field" id="edit-field-en" style="display:none;">
-        <label>Phrase en anglais</label>
-        <textarea id="edit-en" rows="2"></textarea>
+        <label style="display:flex;align-items:center;justify-content:space-between;">
+          Phrase en anglais
+          <button id="edit-correct-btn" onclick="correctEditPhrase()" style="background:none;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;padding:2px 8px;color:var(--text2);">🔧 Corriger</button>
+        </label>
+        <textarea id="edit-en" rows="2" oninput="resetEditCorrection()"></textarea>
+        <div id="edit-phrase-correction" style="display:none;font-size:12px;line-height:1.6;padding:8px 10px;border-radius:var(--radius);background:var(--surface2,#f0f4f8);margin-top:6px;border-left:3px solid var(--green);"></div>
       </div>
       <div class="edit-field" id="edit-field-fr" style="display:none;">
         <label>Traduction française</label>
@@ -1528,6 +1532,7 @@ function openEditPhrase(idx, word, en, fr) {
   document.getElementById('edit-word').value = word;
   document.getElementById('edit-en').value = en;
   document.getElementById('edit-fr').value = fr;
+  resetEditCorrection();
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -1764,6 +1769,57 @@ function buildCorrectionHTML(original, data) {
   return h;
 }
 // Correction inline depuis une carte phrase pratique
+function resetEditCorrection() {
+  const box = document.getElementById('edit-phrase-correction');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  const btn = document.getElementById('edit-correct-btn');
+  if (btn) { btn.textContent = '🔧 Corriger'; btn.disabled = false; }
+}
+
+async function correctEditPhrase() {
+  const input = document.getElementById('edit-en');
+  const text = input.value.trim();
+  if (!text) { showToast('Entrez une phrase à corriger'); return; }
+  const box = document.getElementById('edit-phrase-correction');
+  const btn = document.getElementById('edit-correct-btn');
+  btn.textContent = '⏳'; btn.disabled = true;
+  box.style.display = 'block';
+  box.innerHTML = '<span style="color:var(--text3);">Analyse en cours...</span>';
+  try {
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    let data;
+    const prompt = `Correct this English text. Keep corrected text IN ENGLISH. Explain in French.\n\nINPUT: "${text}"\n\nJSON only: {"score":0-100,"corrected":"corrected English text","tip":"conseil en français max 10 mots"}\n\nIMPORTANT: corrected field must be English, NOT French.`;
+    if (groqKey) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
+      });
+      const d = await res.json();
+      data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}') || { score: 100, corrected: text, tip: '' };
+    } else {
+      const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      data = parseGroqJSON(await res.text()) || { score: 100, corrected: text, tip: '' };
+    }
+    const corrected = data.corrected || text;
+    const score = data.score ?? 100;
+    const tip = data.tip || '';
+    const color = score === 100 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#A32D2D';
+    if (corrected !== text) {
+      // Store corrected text for the button to use
+      window._editCorrected = corrected;
+      box.innerHTML = `<div style="margin-bottom:4px;"><span style="color:${color};font-weight:600;">${score}/100</span> — <span style="color:var(--green);">${corrected}</span> <button class="sound-btn" style="font-size:13px;" onclick="speak(window._editCorrected,'en')">🔊</button></div>${tip ? `<div style="color:var(--text3);font-size:11px;">💡 ${tip}</div>` : ''}<button onclick="document.getElementById('edit-en').value=window._editCorrected;resetEditCorrection();" style="margin-top:8px;padding:5px 12px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;">✅ Utiliser cette version</button>`;
+    } else {
+      box.innerHTML = `<span style="color:var(--green);font-weight:600;">✓ Parfait ! (${score}/100)</span>`;
+      btn.textContent = '✅'; btn.disabled = false;
+    }
+  } catch(err) {
+    box.innerHTML = '<span style="color:#A32D2D;">Erreur — réessayer</span>';
+    btn.textContent = '🔧 Corriger'; btn.disabled = false;
+    console.error(err);
+  }
+}
+
 function resetPhraseCorrection() {
   const box = document.getElementById('new-phrase-correction');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
