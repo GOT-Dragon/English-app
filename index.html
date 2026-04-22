@@ -432,7 +432,11 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         </div>
         <div class="add-form" id="phrase-form">
           <div class="form-field"><input id="new-pw" placeholder="Mot / expression anglais"></div>
-          <div class="form-field"><input id="new-pen" placeholder="Phrase en anglais (optionnel, à compléter plus tard)"></div>
+          <div class="form-field" style="position:relative;">
+            <input id="new-pen" placeholder="Phrase en anglais (optionnel, à compléter plus tard)" oninput="resetPhraseCorrection()">
+            <button id="correct-new-phrase-btn" onclick="correctNewPhrase()" title="Corriger avec l'IA" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;opacity:0.6;" title="Corriger avec l'IA">🔧</button>
+          </div>
+          <div id="new-phrase-correction" style="display:none;font-size:12px;line-height:1.5;padding:6px 10px;border-radius:var(--radius);background:var(--surface2,#f5f5f5);margin-bottom:8px;"></div>
           <div class="form-field"><input id="new-pfr" placeholder="Traduction française (optionnel)"></div>
           <div class="form-actions">
             <button class="btn-primary" onclick="addPhraseEntry()">Enregistrer</button>
@@ -1760,6 +1764,62 @@ function buildCorrectionHTML(original, data) {
   return h;
 }
 // Correction inline depuis une carte phrase pratique
+function resetPhraseCorrection() {
+  const box = document.getElementById('new-phrase-correction');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  const btn = document.getElementById('correct-new-phrase-btn');
+  if (btn) { btn.textContent = '🔧'; btn.disabled = false; }
+}
+
+async function correctNewPhrase() {
+  const input = document.getElementById('new-pen');
+  const text = input.value.trim();
+  if (!text) { showToast('Entrez une phrase à corriger'); return; }
+  const box = document.getElementById('new-phrase-correction');
+  const btn = document.getElementById('correct-new-phrase-btn');
+  btn.textContent = '⏳'; btn.disabled = true;
+  box.style.display = 'block';
+  box.innerHTML = `<span style="color:var(--text3);">Analyse en cours...</span>`;
+  try {
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    let data;
+    if (groqKey) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant', max_tokens: 400,
+          messages: [{ role: 'user', content: `Correct this English text. Keep corrected text IN ENGLISH. Explain in French.\n\nINPUT: "${text}"\n\nJSON only: {"score":0-100,"corrected":"corrected English text","tip":"conseil en français max 10 mots"}\n\nIMPORTANT: corrected field must be English, NOT French.` }]
+        })
+      });
+      const d = await res.json();
+      data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}') || { score: 100, corrected: text, tip: '' };
+    } else {
+      const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      data = parseGroqJSON(await res.text()) || { score: 100, corrected: text, tip: '' };
+    }
+    const corrected = data.corrected || text;
+    const score = data.score ?? 100;
+    const tip = data.tip || '';
+    const color = score === 100 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#A32D2D';
+    const corrEsc = corrected.replace(/'/g, "\\'");
+    if (corrected !== text) {
+      box.innerHTML = `
+        <div style="margin-bottom:4px;"><span style="color:${color};font-weight:600;">${score}/100</span> — <span style="color:var(--green);">${corrected}</span>
+        <button class="sound-btn" style="font-size:13px;" onclick="speak('${corrEsc}','en')">🔊</button></div>
+        ${tip ? `<div style="color:var(--text3);font-size:11px;">💡 ${tip}</div>` : ''}
+        <button onclick="document.getElementById('new-pen').value='${corrEsc}';resetPhraseCorrection();" style="margin-top:6px;padding:4px 10px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;">✅ Utiliser cette version</button>`;
+    } else {
+      box.innerHTML = `<span style="color:var(--green);font-weight:600;">✓ Parfait ! (${score}/100)</span>`;
+      btn.textContent = '✅'; btn.disabled = false;
+    }
+  } catch(err) {
+    box.innerHTML = `<span style="color:#A32D2D;">Erreur — réessayer</span>`;
+    btn.textContent = '🔧'; btn.disabled = false;
+    console.error(err);
+  }
+}
+
 async function correctPhraseInline(btn, text) {
   if (!text) { showToast('Aucune phrase à corriger'); return; }
   const card = btn.closest('.phrase-card');
