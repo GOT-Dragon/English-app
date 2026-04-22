@@ -668,12 +668,12 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         <input id="edit-trans" placeholder="Traduction">
       </div>
       <div class="edit-field" id="edit-field-en" style="display:none;">
-        <label style="display:flex;align-items:center;justify-content:space-between;">
-          Phrase en anglais
-          <button id="edit-correct-btn" onclick="correctEditPhrase()" style="background:none;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;padding:2px 8px;color:var(--text2);">🔧 Corriger</button>
-        </label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <label style="margin-bottom:0;">Phrase en anglais</label>
+          <button id="edit-correct-btn" onclick="correctEditPhrase()" style="background:var(--blue);border:none;border-radius:20px;cursor:pointer;font-size:12px;padding:3px 10px;color:#fff;font-weight:500;">🔧 Corriger</button>
+        </div>
         <textarea id="edit-en" rows="2" oninput="resetEditCorrection()"></textarea>
-        <div id="edit-phrase-correction" style="display:none;font-size:12px;line-height:1.6;padding:8px 10px;border-radius:var(--radius);background:var(--surface2,#f0f4f8);margin-top:6px;border-left:3px solid var(--green);"></div>
+        <div id="edit-phrase-correction" style="display:none;font-size:12px;line-height:1.6;padding:8px 10px;border-radius:var(--radius);background:var(--blue-light);margin-top:6px;border-left:3px solid var(--green);"></div>
       </div>
       <div class="edit-field" id="edit-field-fr" style="display:none;">
         <label>Traduction française</label>
