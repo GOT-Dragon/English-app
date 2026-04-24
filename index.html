@@ -1056,7 +1056,7 @@ function renderDico() {
           <span class="flip-hint">${frontHint}</span>
           <div style="display:flex;gap:4px;position:absolute;bottom:6px;right:6px;" onclick="event.stopPropagation()">
             <button class="sound-btn" onclick="speak('${frontSpeak}','${frontSpeakLang}')" title="Écouter">🔊</button>
-            ${e.custom && dicoMode==='en' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
+            ${dicoMode==='en' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
           </div>
         </div>
         <div class="flip-back">
@@ -1065,7 +1065,7 @@ function renderDico() {
             <button class="sound-btn" onclick="speak('${backSpeak}','${backSpeakLang}')" title="Écouter">🔊</button>
             ${dicoMode==='en' ? `<button class="sound-btn" title="Ajouter à Pratique" onclick="addDicoToPratique('${we}','${te}')">📝</button>` : ''}
             <button class="sound-btn" title="Supprimer ce mot" onclick="confirmDeleteDico(${globalIdx},'${we}')">🗑️</button>
-            ${e.custom && dicoMode==='fr' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
+            ${dicoMode==='fr' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
           </div>
         </div>
       </div>
@@ -1675,6 +1675,7 @@ function saveEditItem() {
     if (!w || !t) { showToast('Remplissez les deux champs'); return; }
     dicoData[editIdx].word = w;
     dicoData[editIdx].trans = t;
+    dicoData[editIdx].custom = true;
     saveData(); scheduleSyncToCloud(); renderDico();
     showToast('Mot modifié !');
   } else {
