@@ -127,13 +127,22 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
 /* PHRASE CARDS */
 .phrase-list { display: flex; flex-direction: column; gap: 7px; }
-.phrase-card { border-radius: var(--radius); border: 0.5px solid var(--border); background: var(--surface); padding: 12px 14px; cursor: pointer; }
+.phrase-card { border-radius: var(--radius); border: 0.5px solid var(--border); background: var(--surface); padding: 12px 14px; cursor: pointer; transition: background .2s, border-color .2s; }
 .phrase-word { font-size: 12px; font-weight: 600; color: var(--blue); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
-.phrase-en { font-size: 14px; color: var(--text); line-height: 1.4; }
+.phrase-en { font-size: 14px; color: var(--text); line-height: 1.4; display: none; }
 .phrase-fr { font-size: 13px; color: var(--green); margin-top: 6px; font-style: italic; display: none; }
-.phrase-card.revealed { background: var(--green-light); border-color: rgba(59,109,17,0.3); }
-.phrase-card.revealed .phrase-fr { display: block; }
+.phrase-actions { display: none; }
 .reveal-hint { font-size: 10px; color: var(--text3); margin-top: 4px; }
+/* Step 1 : phrase EN + boutons */
+.phrase-card.step1 .phrase-en { display: block; }
+.phrase-card.step1 .phrase-actions { display: flex; }
+.phrase-card.step1 .reveal-hint { display: none; }
+/* Step 2 : + traduction + fond vert */
+.phrase-card.step2 .phrase-en { display: block; }
+.phrase-card.step2 .phrase-fr { display: block; }
+.phrase-card.step2 .phrase-actions { display: flex; }
+.phrase-card.step2 .reveal-hint { display: none; }
+.phrase-card.step2 { background: var(--green-light); border-color: rgba(59,109,17,0.3); }
 
 /* PRO CARDS */
 .pro-section { margin-bottom: 14px; border-radius: var(--radius-lg); border: 0.5px solid var(--border); background: var(--surface); overflow: hidden; box-shadow: var(--shadow); }
@@ -353,6 +362,21 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .splash-enter-btn:active { opacity: 0.85; }
 .splash-sound-btn { background: none; border: none; font-size: 20px; cursor: pointer; margin-top: 8px; color: var(--text3); }
 
+
+.debrief-title { font-size:13px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; text-align:left; }
+.debrief-list { text-align:left; display:flex; flex-direction:column; gap:6px; }
+.debrief-item { border-radius:var(--radius); padding:10px 12px; cursor:pointer; transition:opacity .15s; border-left:4px solid; }
+.debrief-item:active { opacity:.75; }
+.debrief-ok { background:rgba(34,197,94,.1); border-color:#22c55e; }
+.debrief-ko { background:rgba(249,115,22,.1); border-color:#f97316; }
+.debrief-header { display:flex; align-items:center; gap:8px; }
+.debrief-icon { font-size:13px; font-weight:700; flex-shrink:0; }
+.debrief-ok .debrief-icon { color:#22c55e; }
+.debrief-ko .debrief-icon { color:#f97316; }
+.debrief-word { font-weight:600; font-size:14px; color:var(--text); flex:1; }
+.debrief-chosen { font-size:12px; color:var(--text3); flex-shrink:0; max-width:45%; text-align:right; }
+.debrief-ko .debrief-chosen { color:#f97316; }
+.debrief-answer { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:13px; color:var(--text2); line-height:1.5; }
 </style>
 </head>
 <body>
@@ -416,9 +440,14 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
           </div>
         </div>
         <div class="alpha-nav" id="dico-alpha"></div>
-        <div class="stats-row">
-          <div class="stat-chip"><strong id="dico-count">0</strong> mots</div>
-          <div class="stat-chip">Page <strong id="dico-pn">1</strong>/<strong id="dico-pt">1</strong></div>
+        <div class="stats-row" style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;gap:6px;">
+            <div class="stat-chip"><strong id="dico-count">0</strong> mots</div>
+            <div class="stat-chip">Page <strong id="dico-pn">1</strong>/<strong id="dico-pt">1</strong></div>
+          </div>
+          <button id="dico-mode-btn" onclick="toggleDicoMode()" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--blue);background:var(--surface);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;">
+            🇬🇧 EN→FR
+          </button>
         </div>
         <div class="cards-grid" id="dico-grid"></div>
         <div class="pagination" id="dico-pages"></div>
@@ -670,10 +699,14 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <div class="edit-field" id="edit-field-en" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <label style="margin-bottom:0;">Phrase en anglais</label>
-          <button id="edit-correct-btn" onclick="correctEditPhrase()" style="background:var(--blue);border:none;border-radius:20px;cursor:pointer;font-size:12px;padding:3px 10px;color:#fff;font-weight:500;">🔧 Corriger</button>
+          <div style="display:flex;gap:6px;">
+            <button id="edit-generate-btn" onclick="generatePhraseForWord()" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;padding:3px 10px;color:var(--text);font-weight:500;">✨ Créer</button>
+            <button id="edit-correct-btn" onclick="correctEditPhrase()" style="background:var(--blue);border:none;border-radius:20px;cursor:pointer;font-size:12px;padding:3px 10px;color:#fff;font-weight:500;">🔧 Corriger</button>
+          </div>
         </div>
         <textarea id="edit-en" rows="2" oninput="resetEditCorrection()"></textarea>
         <div id="edit-phrase-correction" style="display:none;font-size:12px;line-height:1.6;padding:8px 10px;border-radius:var(--radius);background:var(--blue-light);margin-top:6px;border-left:3px solid var(--green);"></div>
+        <div id="edit-phrase-generated" style="display:none;font-size:12px;line-height:1.6;padding:8px 10px;border-radius:var(--radius);background:rgba(139,92,246,.08);margin-top:6px;border-left:3px solid #8b5cf6;"></div>
       </div>
       <div class="edit-field" id="edit-field-fr" style="display:none;">
         <label>Traduction française</label>
@@ -945,6 +978,54 @@ function toggleAddForm(id) { document.getElementById(id).classList.toggle('open'
 // ═══════════════════════════════════════════
 // DICO
 // ═══════════════════════════════════════════
+function confirmDeleteDico(idx, word) {
+  const modal = document.getElementById('confirm-delete-modal');
+  document.getElementById('confirm-delete-word').textContent = word;
+  modal.style.display = 'flex';
+  modal._idx = idx;
+  modal._word = word;
+}
+function doDeleteDico() {
+  const modal = document.getElementById('confirm-delete-modal');
+  const idx = modal._idx;
+  const word = modal._word;
+  modal.style.display = 'none';
+  // Remove from dico
+  dicoData.splice(idx, 1);
+  // Remove matching entries from phrases pratiques
+  const before = phraseData.length;
+  phraseData = phraseData.filter(p => p.word.toLowerCase() !== word.toLowerCase());
+  const removed = before - phraseData.length;
+  saveData();
+  scheduleSyncToCloud();
+  renderDico();
+  renderPhrases();
+  const msg = removed > 0
+    ? `"${word}" supprimé du dico et de Pratique`
+    : `"${word}" supprimé du dico`;
+  showToast(msg);
+}
+function cancelDeleteDico() {
+  document.getElementById('confirm-delete-modal').style.display = 'none';
+}
+
+let dicoMode = 'en'; // 'en' = anglais face avant, 'fr' = français face avant
+
+function toggleDicoMode() {
+  dicoMode = dicoMode === 'en' ? 'fr' : 'en';
+  const btn = document.getElementById('dico-mode-btn');
+  if (btn) {
+    btn.innerHTML = dicoMode === 'en' ? '🇬🇧 EN→FR' : '🇫🇷 FR→EN';
+    btn.style.background = dicoMode === 'fr' ? 'var(--blue)' : 'var(--surface)';
+    btn.style.color = dicoMode === 'fr' ? '#fff' : 'var(--blue)';
+  }
+  // Flip all cards to match the new mode
+  document.querySelectorAll('#dico-grid .flip-card').forEach(card => {
+    if (dicoMode === 'fr') card.classList.add('flipped');
+    else card.classList.remove('flipped');
+  });
+}
+
 function renderDico() {
   let d = dicoData;
   if(dicoFilter) d=d.filter(e=>e.word.toLowerCase().includes(dicoFilter.toLowerCase())||e.trans.toLowerCase().includes(dicoFilter.toLowerCase()));
@@ -961,27 +1042,40 @@ function renderDico() {
     const globalIdx = dicoData.indexOf(e);
     const we = e.word.replace(/'/g,"\\'");
     const te = e.trans.replace(/'/g,"\\'");
-    return `<div class="flip-card" onclick="this.classList.toggle('flipped')">
+    const frontWord = dicoMode === 'fr' ? e.trans : e.word;
+    const frontSpeakLang = dicoMode === 'fr' ? 'fr' : 'en';
+    const frontSpeak = dicoMode === 'fr' ? te : we;
+    const backWord = dicoMode === 'fr' ? e.word : e.trans;
+    const backSpeakLang = dicoMode === 'fr' ? 'en' : 'fr';
+    const backSpeak = dicoMode === 'fr' ? we : te;
+    const frontHint = dicoMode === 'fr' ? 'appuyer pour voir en anglais' : 'appuyer pour voir';
+    return `<div class="flip-card${dicoMode==='fr'?' flipped':''}" onclick="this.classList.toggle('flipped')">
       <div class="flip-inner">
         <div class="flip-front">
-          <span class="flip-word">${e.word}</span>
-          <span class="flip-hint">appuyer pour voir</span>
+          <span class="flip-word">${frontWord}</span>
+          <span class="flip-hint">${frontHint}</span>
           <div style="display:flex;gap:4px;position:absolute;bottom:6px;right:6px;" onclick="event.stopPropagation()">
-            <button class="sound-btn" onclick="speak('${we}','en')" title="Écouter">🔊</button>
-            ${e.custom ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
+            <button class="sound-btn" onclick="speak('${frontSpeak}','${frontSpeakLang}')" title="Écouter">🔊</button>
+            ${e.custom && dicoMode==='en' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
           </div>
         </div>
         <div class="flip-back">
-          <span class="flip-trans">${e.trans}</span>
+          <span class="flip-trans">${backWord}</span>
           <div style="position:absolute;bottom:6px;right:6px;display:flex;gap:3px;" onclick="event.stopPropagation()">
-            <button class="sound-btn" onclick="speak('${te}','fr')" title="Écouter en français">🔊</button>
-            <button class="sound-btn" title="Ajouter à Pratique" onclick="addDicoToPratique('${we}','${te}')">📝</button>
+            <button class="sound-btn" onclick="speak('${backSpeak}','${backSpeakLang}')" title="Écouter">🔊</button>
+            ${dicoMode==='en' ? `<button class="sound-btn" title="Ajouter à Pratique" onclick="addDicoToPratique('${we}','${te}')">📝</button>` : ''}
+            <button class="sound-btn" title="Supprimer ce mot" onclick="confirmDeleteDico(${globalIdx},'${we}')">🗑️</button>
+            ${e.custom && dicoMode==='fr' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
           </div>
         </div>
       </div>
     </div>`;
   }).join('');
   renderPages('dico-pages',dicoPage,tp,p=>{dicoPage=p;renderDico();});
+  // Apply current mode after render
+  if (dicoMode === 'fr') {
+    document.querySelectorAll('#dico-grid .flip-card').forEach(c => c.classList.add('flipped'));
+  }
 }
 function setDL(l){dicoLetter=l;dicoPage=1;renderDico();}
 function filterDico(){dicoFilter=document.getElementById('dico-search').value;dicoPage=1;renderDico();}
@@ -1018,6 +1112,17 @@ function addDicoToPratique(word, trans) {
   }, 200);
 }
 // ═══════════════════════════════════════════
+function cyclePhrase(card) {
+  if (card.classList.contains('step2')) {
+    card.classList.remove('step1', 'step2');
+  } else if (card.classList.contains('step1')) {
+    card.classList.remove('step1');
+    card.classList.add('step2');
+  } else {
+    card.classList.add('step1');
+  }
+}
+
 function renderPhrases() {
   let d=phraseData;
   if(phraseFilter) d=d.filter(e=>e.word.toLowerCase().includes(phraseFilter.toLowerCase())||e.en.toLowerCase().includes(phraseFilter.toLowerCase()));
@@ -1033,18 +1138,18 @@ function renderPhrases() {
     const we = e.word.replace(/'/g,"\\'");
     const ee = e.en.replace(/'/g,"\\'");
     const fe = (e.fr||'').replace(/'/g,"\\'");
-    return `<div class="phrase-card" onclick="this.classList.toggle('revealed')">
+    return `<div class="phrase-card" onclick="cyclePhrase(this)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
         <div class="phrase-word">${e.word}</div>
-        <div style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
+        <div class="phrase-actions" style="gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
           <button class="sound-btn" onclick="speak('${ee}','en')" title="Écouter">🔊</button>
           ${e.custom ? `<button class="sound-btn" title="Corriger avec l'IA" onclick="correctPhraseInline(this,'${ee}')">🔧</button>` : ''}
           ${e.custom ? `<button class="sound-btn" onclick="openEditPhrase(${globalIdx},'${we}','${ee}','${fe}')" title="Modifier">✏️</button>` : ''}
         </div>
       </div>
+      <div class="reveal-hint">appuyez pour révéler</div>
       <div class="phrase-en">${e.en}</div>
       <div class="phrase-fr">${e.fr||'<em style="color:var(--text3)">Pas de traduction</em>'}</div>
-      <div class="reveal-hint">appuyez pour révéler la traduction</div>
       <div class="phrase-correct-result" style="display:none;margin-top:8px;"></div>
     </div>`;
   }).join('');
@@ -1189,7 +1294,7 @@ function setQMode(m, btn) {
 function initQuiz() {
   const pool=qMode==='phrase'?phraseData:dicoData;
   qItems=[...pool].sort(()=>Math.random()-0.5).slice(0,12);
-  qIdx=0;qScore=0;qAnswered=false;
+  qIdx=0;qScore=0;qAnswered=false;qResults=[];
   renderQ();
 }
 function renderQ() {
@@ -1197,11 +1302,31 @@ function renderQ() {
   if(qIdx>=qItems.length){
     const pct=Math.round(qScore/qItems.length*100);
     const emoji=pct>=80?'🎉':pct>=50?'👍':'💪';
+    // Build debrief rows
+    const debriefRows = qResults.map((r,i) => {
+      const ok = r.chosen === r.correct;
+      const label = qMode==='phrase' ? r.item.word : (qMode==='reverse' ? r.item.word : r.item.word);
+      const answerLine = qMode==='dico'
+        ? `<strong>${r.item.word}</strong> → ${r.item.trans}`
+        : qMode==='reverse'
+        ? `<strong>${r.item.trans}</strong> → ${r.item.word}`
+        : `<strong>${r.item.word}</strong> : ${r.item.en}`;
+      return `<div class="debrief-item ${ok?'debrief-ok':'debrief-ko'}" onclick="this.querySelector('.debrief-answer').style.display=this.querySelector('.debrief-answer').style.display==='none'?'block':'none'">
+        <div class="debrief-header">
+          <span class="debrief-icon">${ok?'✓':'✗'}</span>
+          <span class="debrief-word">${label}</span>
+          <span class="debrief-chosen">${ok?r.chosen:''+r.chosen+' → '+r.correct+''}</span>
+        </div>
+        <div class="debrief-answer" style="display:none;">${answerLine}</div>
+      </div>`;
+    }).join('');
     box.innerHTML=`<div class="quiz-end">
       <div class="quiz-end-score">${emoji}</div>
       <div class="quiz-end-score">${qScore}/${qItems.length}</div>
       <div class="quiz-end-label">${pct}% de réussite</div>
-      <button class="btn-primary" onclick="initQuiz()">Recommencer</button>
+      <button class="btn-primary" onclick="initQuiz()" style="margin-bottom:20px;">🔄 Recommencer</button>
+      <div class="debrief-title">📋 Récapitulatif</div>
+      <div class="debrief-list">${debriefRows}</div>
     </div>`;
     return;
   }
@@ -1260,6 +1385,7 @@ function answerQ(btn,chosen,correct){
     b.disabled=true;
   });
   if(chosen===correct)qScore++;
+  qResults.push({item:qItems[qIdx],chosen,correct});
   const fb=document.getElementById('quiz-fb');
   if(fb)fb.textContent=chosen===correct?'Correct ✓':'Raté — '+correct;
   document.getElementById('quiz-next-row').style.display='flex';
@@ -1533,6 +1659,8 @@ function openEditPhrase(idx, word, en, fr) {
   document.getElementById('edit-en').value = en;
   document.getElementById('edit-fr').value = fr;
   resetEditCorrection();
+  const genBox = document.getElementById('edit-phrase-generated'); if(genBox){genBox.style.display='none';genBox.innerHTML='';}
+  const genBtn = document.getElementById('edit-generate-btn'); if(genBtn){genBtn.textContent='✨ Créer';genBtn.disabled=false;}
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -1776,6 +1904,83 @@ function resetEditCorrection() {
   if (btn) { btn.textContent = '🔧 Corriger'; btn.disabled = false; }
 }
 
+async function generatePhraseForWord() {
+  const word = document.getElementById('edit-word').value.trim();
+  if (!word) { showToast('Aucun mot défini'); return; }
+  const btn = document.getElementById('edit-generate-btn');
+  const box = document.getElementById('edit-phrase-generated');
+  // Hide correction box if visible
+  document.getElementById('edit-phrase-correction').style.display = 'none';
+  btn.textContent = '⏳'; btn.disabled = true;
+  box.style.display = 'block';
+  box.innerHTML = '<span style="color:var(--text3);">Génération en cours...</span>';
+  try {
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    const prompt = `You are an English teacher. Generate 3 short, natural, correct English sentences using the word or expression "${word}".
+The sentences must be simple (A2-B1 level), realistic and varied in context.
+Reply ONLY with this exact JSON, no markdown:
+{"sentences":["sentence 1","sentence 2","sentence 3"]}`;
+    let sentences = [];
+    if (groqKey) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+      });
+      const d = await res.json();
+      const parsed = parseGroqJSON(d.choices?.[0]?.message?.content || '{}');
+      sentences = parsed?.sentences || [];
+    } else {
+      const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: `Generate 3 sentences with: ${word}`, mode: 'generate' }) });
+      const parsed = parseGroqJSON(await res.text());
+      sentences = parsed?.sentences || [];
+    }
+    if (!sentences.length) throw new Error('Aucune phrase générée');
+    const rows = sentences.map((s, i) => {
+      const esc = s.replace(/'/g, "\'");
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;${i>0?'border-top:1px solid var(--border);':''}">
+        <span style="flex:1;font-size:13px;color:var(--text);">${s}</span>
+        <button class="sound-btn" onclick="speak('${esc}','en')" style="font-size:13px;flex-shrink:0;">🔊</button>
+        <button onclick="document.getElementById('edit-en').value='${esc}';document.getElementById('edit-phrase-generated').style.display='none';document.getElementById('edit-generate-btn').textContent='✨ Créer';document.getElementById('edit-generate-btn').disabled=false;" style="flex-shrink:0;padding:3px 8px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:11px;cursor:pointer;font-weight:600;">Utiliser</button>
+      </div>`;
+    }).join('');
+    box.innerHTML = `<div style="font-size:11px;font-weight:700;color:#8b5cf6;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">✨ Phrases suggérées pour "${word}"</div>${rows}`;
+    btn.textContent = '✨ Créer'; btn.disabled = false;
+  } catch(err) {
+    box.innerHTML = '<span style="color:#A32D2D;">Erreur — réessayer</span>';
+    btn.textContent = '✨ Créer'; btn.disabled = false;
+    console.error(err);
+  }
+}
+
+function buildInlineCorrHTML(data, text, onUseCallback) {
+  const corrected = data.corrected || text;
+  const score = data.score ?? 100;
+  const errors = data.errors || [];
+  const tip = data.tip || '';
+  const isPerfect = score === 100 && corrected.trim().toLowerCase() === text.trim().toLowerCase();
+  const color = isPerfect ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#c0392b';
+  const label = isPerfect ? 'Parfait !' : score >= 75 ? 'Très bien' : score >= 50 ? 'À améliorer' : 'Erreurs détectées';
+
+  if (isPerfect) {
+    return `<div style="color:var(--green);font-weight:600;">✓ ${label} (${score}/100)</div>`;
+  }
+
+  window._inlineCorrection = corrected;
+  let errHTML = '';
+  if (errors.length) {
+    errHTML = errors.map(e =>
+      `<div style="margin-top:4px;">❌ <span style="color:#c0392b;text-decoration:line-through;">${e.original||e.wrong||''}</span> → <span style="color:var(--green);font-weight:600;">${e.fixed||e.fix||''}</span> <span style="color:var(--text3);font-size:11px;">${e.reason||''}</span></div>`
+    ).join('');
+  }
+  return `
+    <div style="margin-bottom:6px;"><span style="color:${color};font-weight:700;">${score}/100</span> — <span style="color:var(--text3);">${label}</span></div>
+    <div style="color:var(--green);font-size:13px;margin-bottom:4px;">✔ ${corrected} <button class="sound-btn" style="font-size:13px;" onclick="speak(window._inlineCorrection,'en')">🔊</button></div>
+    ${errHTML}
+    ${tip ? `<div style="color:var(--text3);font-size:11px;margin-top:4px;">💡 ${tip}</div>` : ''}
+    <button onclick="${onUseCallback}" style="margin-top:8px;padding:5px 14px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;font-weight:600;">✅ Utiliser cette version</button>`;
+}
+
 async function correctEditPhrase() {
   const input = document.getElementById('edit-en');
   const text = input.value.trim();
@@ -1788,12 +1993,27 @@ async function correctEditPhrase() {
   try {
     const groqKey = localStorage.getItem('eng_groq_key') || '';
     let data;
-    const prompt = `Correct this English text. Keep corrected text IN ENGLISH. Explain in French.\n\nINPUT: "${text}"\n\nJSON only: {"score":0-100,"corrected":"corrected English text","tip":"conseil en français max 10 mots"}\n\nIMPORTANT: corrected field must be English, NOT French.`;
+    const prompt = `You are a strict English spelling and grammar corrector. The user wrote this text in English.
+
+INPUT TEXT: "${text}"
+
+Your job:
+1. ALWAYS check for spelling mistakes first (e.g. "dsilike" → "dislike", "teh" → "the")
+2. Fix ALL grammar, spelling, and vocabulary errors
+3. Keep the corrected text IN ENGLISH (do NOT translate to French)
+4. Explain errors briefly IN FRENCH
+
+A score of 100/100 means ZERO errors. If there is ANY spelling or grammar mistake, the score MUST be below 100.
+
+Reply ONLY with this exact JSON, no markdown, no extra text:
+{"score":85,"corrected":"the corrected English text here","errors":[{"original":"wrong","fixed":"correct","reason":"explication en français"}],"tip":"conseil court en français"}
+
+CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.`;
     if (groqKey) {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-        body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 600, messages: [{ role: 'user', content: prompt }] })
       });
       const d = await res.json();
       data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}') || { score: 100, corrected: text, tip: '' };
@@ -1801,18 +2021,10 @@ async function correctEditPhrase() {
       const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
       data = parseGroqJSON(await res.text()) || { score: 100, corrected: text, tip: '' };
     }
-    const corrected = data.corrected || text;
-    const score = data.score ?? 100;
-    const tip = data.tip || '';
-    const color = score === 100 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#A32D2D';
-    if (corrected !== text) {
-      // Store corrected text for the button to use
-      window._editCorrected = corrected;
-      box.innerHTML = `<div style="margin-bottom:4px;"><span style="color:${color};font-weight:600;">${score}/100</span> — <span style="color:var(--green);">${corrected}</span> <button class="sound-btn" style="font-size:13px;" onclick="speak(window._editCorrected,'en')">🔊</button></div>${tip ? `<div style="color:var(--text3);font-size:11px;">💡 ${tip}</div>` : ''}<button onclick="document.getElementById('edit-en').value=window._editCorrected;resetEditCorrection();" style="margin-top:8px;padding:5px 12px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;">✅ Utiliser cette version</button>`;
-    } else {
-      box.innerHTML = `<span style="color:var(--green);font-weight:600;">✓ Parfait ! (${score}/100)</span>`;
-      btn.textContent = '✅'; btn.disabled = false;
-    }
+    box.innerHTML = buildInlineCorrHTML(data, text, "document.getElementById('edit-en').value=window._inlineCorrection;resetEditCorrection();");
+    const isPerfect = (data.score ?? 100) === 100 && (data.corrected||text).trim().toLowerCase() === text.trim().toLowerCase();
+    if (isPerfect) { btn.textContent = '✅'; btn.disabled = false; }
+    else { btn.textContent = '🔧 Corriger'; btn.disabled = false; }
   } catch(err) {
     box.innerHTML = '<span style="color:#A32D2D;">Erreur — réessayer</span>';
     btn.textContent = '🔧 Corriger'; btn.disabled = false;
@@ -1845,7 +2057,22 @@ async function correctNewPhrase() {
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant', max_tokens: 400,
-          messages: [{ role: 'user', content: `Correct this English text. Keep corrected text IN ENGLISH. Explain in French.\n\nINPUT: "${text}"\n\nJSON only: {"score":0-100,"corrected":"corrected English text","tip":"conseil en français max 10 mots"}\n\nIMPORTANT: corrected field must be English, NOT French.` }]
+          messages: [{ role: 'user', content: `You are a strict English spelling and grammar corrector. The user wrote this text in English.
+
+INPUT TEXT: "${text}"
+
+Your job:
+1. ALWAYS check for spelling mistakes first (e.g. "dsilike" → "dislike", "teh" → "the")
+2. Fix ALL grammar, spelling, and vocabulary errors
+3. Keep the corrected text IN ENGLISH (do NOT translate to French)
+4. Explain errors briefly IN FRENCH
+
+A score of 100/100 means ZERO errors. If there is ANY spelling or grammar mistake, the score MUST be below 100.
+
+Reply ONLY with this exact JSON, no markdown, no extra text:
+{"score":85,"corrected":"the corrected English text here","errors":[{"original":"wrong","fixed":"correct","reason":"explication en français"}],"tip":"conseil court en français"}
+
+CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.` }]
         })
       });
       const d = await res.json();
@@ -1854,21 +2081,10 @@ async function correctNewPhrase() {
       const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
       data = parseGroqJSON(await res.text()) || { score: 100, corrected: text, tip: '' };
     }
-    const corrected = data.corrected || text;
-    const score = data.score ?? 100;
-    const tip = data.tip || '';
-    const color = score === 100 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : '#A32D2D';
-    const corrEsc = corrected.replace(/'/g, "\\'");
-    if (corrected !== text) {
-      box.innerHTML = `
-        <div style="margin-bottom:4px;"><span style="color:${color};font-weight:600;">${score}/100</span> — <span style="color:var(--green);">${corrected}</span>
-        <button class="sound-btn" style="font-size:13px;" onclick="speak('${corrEsc}','en')">🔊</button></div>
-        ${tip ? `<div style="color:var(--text3);font-size:11px;">💡 ${tip}</div>` : ''}
-        <button onclick="document.getElementById('new-pen').value='${corrEsc}';resetPhraseCorrection();" style="margin-top:6px;padding:4px 10px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;">✅ Utiliser cette version</button>`;
-    } else {
-      box.innerHTML = `<span style="color:var(--green);font-weight:600;">✓ Parfait ! (${score}/100)</span>`;
-      btn.textContent = '✅'; btn.disabled = false;
-    }
+    box.innerHTML = buildInlineCorrHTML(data, text, "document.getElementById('new-pen').value=window._inlineCorrection;resetPhraseCorrection();");
+    const isPerfect = (data.score ?? 100) === 100 && (data.corrected||text).trim().toLowerCase() === text.trim().toLowerCase();
+    if (isPerfect) { btn.textContent = '✅'; btn.disabled = false; }
+    else { btn.textContent = '🔧'; btn.disabled = false; }
   } catch(err) {
     box.innerHTML = `<span style="color:#A32D2D;">Erreur — réessayer</span>`;
     btn.textContent = '🔧'; btn.disabled = false;
@@ -2352,5 +2568,19 @@ if (sbUrl && sbKey) {
   setInterval(() => syncToCloud(), 5 * 60 * 1000);
 }
 </script>
+
+<!-- Confirm delete dico modal -->
+<div id="confirm-delete-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border-radius:16px;padding:24px 20px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2);text-align:center;">
+    <div style="font-size:32px;margin-bottom:12px;">🗑️</div>
+    <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:6px;">Supprimer ce mot ?</div>
+    <div style="font-size:14px;color:var(--text2);margin-bottom:4px;"><strong id="confirm-delete-word" style="color:var(--blue);"></strong></div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:20px;">Ce mot sera supprimé du Dico et de la section Pratique si une phrase y est associée.</div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="cancelDeleteDico()" style="flex:1;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;cursor:pointer;font-weight:500;">Annuler</button>
+      <button onclick="doDeleteDico()" style="flex:1;padding:10px;border-radius:var(--radius);border:none;background:#c0392b;color:#fff;font-size:14px;cursor:pointer;font-weight:600;">Supprimer</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
