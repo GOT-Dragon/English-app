@@ -531,6 +531,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <div class="sub-tabs">
         <button class="sub-tab active" onclick="goSub('oral','ecoute',this)">Écouter</button>
         <button class="sub-tab" onclick="goSub('oral','parler',this)">Parler</button>
+        <button class="sub-tab" onclick="goSub('oral','dialogue',this)">💬 Dialogue</button>
       </div>
       <div class="sub-section active" id="o-ecoute">
         <div class="routine-grid">
@@ -567,6 +568,37 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         <div class="ex-card"><span class="ex-tag tag-oral">oral</span><h3>Jeu de rôle professionnel</h3><p>Présentez un projet en 3 phrases. Utilisez : "It is paramount that…", "Let us circle back", "I will run the idea past the team".</p></div>
         <div class="ex-card"><span class="ex-tag tag-oral">oral</span><h3>Auto-interview</h3><p>Posez-vous 5 questions en anglais et répondez à voix haute. Ex : "What did you accomplish this week?"</p></div>
         <div class="ex-card"><span class="ex-tag tag-oral">oral</span><h3>Répétition phrases pro</h3><p>5 phrases de la section Pro. Lisez chaque phrase 3 fois en accélérant progressivement. Puis reformulez sans regarder.</p></div>
+      </div>
+
+      <!-- DIALOGUE IA -->
+      <div class="sub-section" id="o-dialogue">
+        <div style="display:flex;flex-direction:column;height:calc(100vh - 220px);gap:10px;">
+
+          <!-- Config bar -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 0;">
+            <select id="dial-mode" onchange="resetDialogue()" style="flex:1;min-width:140px;padding:6px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;">
+              <option value="free">💬 Conversation libre</option>
+              <option value="restaurant">🍽️ Au restaurant</option>
+              <option value="meeting">💼 En réunion</option>
+              <option value="travel">✈️ En voyage</option>
+              <option value="interview">🎯 Entretien d'embauche</option>
+              <option value="shopping">🛒 Shopping</option>
+              <option value="phone">📞 Appel téléphonique</option>
+              <option value="debate">🗣️ Débat / opinion</option>
+            </select>
+            <button id="dial-lang-btn" onclick="toggleDialLang()" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--blue);background:var(--surface);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🇬🇧 EN only</button>
+            <button onclick="resetDialogue()" style="padding:6px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text3);font-size:12px;cursor:pointer;">↺ Reset</button>
+          </div>
+
+          <!-- Messages -->
+          <div id="dial-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0;"></div>
+
+          <!-- Input -->
+          <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:4px;">
+            <textarea id="dial-input" placeholder="Type your message in English…" rows="2" style="flex:1;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;resize:none;font-family:inherit;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDialogue();}"></textarea>
+            <button onclick="sendDialogue()" id="dial-send-btn" style="padding:10px 16px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;align-self:stretch;">➤</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -962,7 +994,7 @@ function goSection(id, btn) {
   document.getElementById('main-scroll').scrollTop=0;
 }
 function goSub(sec, id, btn) {
-  const map={vocab:['dico','pratique','pro','quiz'],oral:['ecoute','parler'],ecrit:['lire','ecrire']};
+  const map={vocab:['dico','pratique','pro','quiz'],oral:['ecoute','parler','dialogue'],ecrit:['lire','ecrire']};
   const pre={vocab:'v-',oral:'o-',ecrit:'e-'};
   const parent=document.getElementById('s-'+sec);
   parent.querySelectorAll('.sub-section').forEach(s=>s.classList.remove('active'));
@@ -971,6 +1003,7 @@ function goSub(sec, id, btn) {
   btn.classList.add('active');
   document.getElementById('main-scroll').scrollTop=0;
   if(id==='quiz') initQuiz();
+  if(id==='dialogue' && typeof dialHistory !== 'undefined' && dialHistory.length === 0) setTimeout(resetDialogue, 50);
   if(id==='pro') renderPro();
 }
 function toggleAddForm(id) { document.getElementById(id).classList.toggle('open'); }
@@ -2092,6 +2125,170 @@ CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.` 
     console.error(err);
   }
 }
+
+
+// ── DIALOGUE IA ──────────────────────────────────────────────
+let dialHistory = [];
+let dialLangMode = 'en'; // 'en' = English only, 'bilingual'
+
+const DIAL_SYSTEM = {
+  free: `You are a friendly English conversation partner helping a French speaker practice English. Keep your replies natural, 2-4 sentences. If bilingual mode, add a brief French tip about any error (prefixed with 💡).`,
+  restaurant: `You are a waiter in a nice English-speaking restaurant. The user is a customer. Stay in character. Keep replies natural, 2-4 sentences. If bilingual mode, add a French tip about any English error (prefixed with 💡).`,
+  meeting: `You are a colleague in a professional English meeting. The user is a participant. Keep a business-like tone, 2-4 sentences. If bilingual mode, add a French tip about any English error (prefixed with 💡).`,
+  travel: `You are a helpful airport/hotel staff member. The user is a traveller. Keep replies natural, 2-4 sentences. If bilingual mode, add a French tip (prefixed with 💡).`,
+  interview: `You are a recruiter conducting a job interview in English. Ask relevant questions and react to answers. 2-4 sentences. If bilingual mode, add a French coaching tip (prefixed with 💡).`,
+  shopping: `You are a shop assistant in an English-speaking store. The user is a customer. Keep replies natural, 2-4 sentences. If bilingual mode, add a French tip (prefixed with 💡).`,
+  phone: `You are on a professional phone call in English with the user. Keep replies concise and realistic, 2-4 sentences. If bilingual mode, add a French tip (prefixed with 💡).`,
+  debate: `You are an English debate partner. The user shares an opinion; you respond thoughtfully, agree or challenge politely. 2-4 sentences. If bilingual mode, add a French tip (prefixed with 💡).`
+};
+
+const DIAL_STARTER = {
+  free: `Hello! I'm happy to chat with you in English. What would you like to talk about today?`,
+  restaurant: `Good evening! Welcome to The Oak Room. My name is James and I'll be your server tonight. Can I start you off with something to drink?`,
+  meeting: `Good morning everyone. Thanks for joining. Let's get started — could you give us a quick update on where things stand?`,
+  travel: `Welcome to Heathrow Airport. How can I help you today?`,
+  interview: `Thank you for coming in today. Please have a seat. Could you start by telling me a little about yourself and your background?`,
+  shopping: `Hi there, welcome! Are you looking for something in particular today, or just browsing?`,
+  phone: `Hello, this is Sarah from the accounts team. Am I speaking with the right person? I wanted to follow up on your recent enquiry.`,
+  debate: `I'd love to hear your thoughts on a topic. What's something you feel strongly about lately?`
+};
+
+function toggleDialLang() {
+  dialLangMode = dialLangMode === 'en' ? 'bilingual' : 'en';
+  const btn = document.getElementById('dial-lang-btn');
+  if (dialLangMode === 'bilingual') {
+    btn.textContent = '🇫🇷 Bilingue';
+    btn.style.background = 'var(--blue)';
+    btn.style.color = '#fff';
+  } else {
+    btn.textContent = '🇬🇧 EN only';
+    btn.style.background = 'var(--surface)';
+    btn.style.color = 'var(--blue)';
+  }
+  // Rebuild system message in history
+  if (dialHistory.length > 0) {
+    dialHistory[0].content = getDialSystem();
+  }
+}
+
+function getDialSystem() {
+  const mode = document.getElementById('dial-mode').value;
+  const base = DIAL_SYSTEM[mode] || DIAL_SYSTEM.free;
+  if (dialLangMode === 'bilingual') {
+    return base.replace('If bilingual mode, add', 'ALWAYS add');
+  }
+  return base.replace(/If bilingual mode[^.]+\./g, 'Do NOT add any French text.');
+}
+
+function resetDialogue() {
+  dialHistory = [];
+  const box = document.getElementById('dial-messages');
+  box.innerHTML = '';
+  // Show starter message
+  const mode = document.getElementById('dial-mode').value;
+  const starter = DIAL_STARTER[mode] || DIAL_STARTER.free;
+  dialHistory.push({ role: 'system', content: getDialSystem() });
+  dialHistory.push({ role: 'assistant', content: starter });
+  addDialMsg('assistant', starter);
+}
+
+function addDialMsg(role, text) {
+  const box = document.getElementById('dial-messages');
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = `display:flex;flex-direction:column;align-items:${isUser?'flex-end':'flex-start'};`;
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `max-width:85%;padding:10px 14px;border-radius:${isUser?'18px 18px 4px 18px':'18px 18px 18px 4px'};background:${isUser?'var(--blue)':'var(--surface2,#f0f4f8)'};color:${isUser?'#fff':'var(--text)'};font-size:14px;line-height:1.5;white-space:pre-wrap;`;
+
+  // Parse 💡 tips as styled sub-text
+  const parts = text.split(/(💡[^\n]+)/g);
+  parts.forEach(p => {
+    if (p.startsWith('💡')) {
+      const tip = document.createElement('div');
+      tip.style.cssText = `font-size:12px;color:${isUser?'rgba(255,255,255,.8)':'var(--text3)'};margin-top:6px;font-style:italic;`;
+      tip.textContent = p;
+      bubble.appendChild(tip);
+    } else if (p) {
+      const t = document.createElement('span');
+      t.textContent = p;
+      bubble.appendChild(t);
+    }
+  });
+
+  // Audio button for assistant
+  if (!isUser) {
+    const audio = document.createElement('button');
+    audio.className = 'sound-btn';
+    audio.style.cssText = 'font-size:13px;margin-top:4px;align-self:flex-start;';
+    audio.textContent = '🔊';
+    audio.onclick = () => speak(text.replace(/💡[^\n]+/g,''), 'en');
+    div.appendChild(bubble);
+    div.appendChild(audio);
+  } else {
+    div.appendChild(bubble);
+  }
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendDialogue() {
+  const input = document.getElementById('dial-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const btn = document.getElementById('dial-send-btn');
+
+  // Init conversation if empty
+  if (dialHistory.length === 0) resetDialogue();
+
+  input.value = '';
+  btn.disabled = true;
+  addDialMsg('user', text);
+  dialHistory.push({ role: 'user', content: text });
+
+  // Thinking indicator
+  const box = document.getElementById('dial-messages');
+  const thinking = document.createElement('div');
+  thinking.id = 'dial-thinking';
+  thinking.style.cssText = 'color:var(--text3);font-size:13px;padding:4px 8px;';
+  thinking.textContent = '…';
+  box.appendChild(thinking);
+  box.scrollTop = box.scrollHeight;
+
+  try {
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    if (!groqKey) {
+      thinking.remove();
+      addDialMsg('assistant', "⚠️ Please set your Groq API key in Settings to use the Dialogue feature.");
+      btn.disabled = false;
+      return;
+    }
+
+    const msgs = dialHistory.filter(m => m.role !== 'system').slice(-10);
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 300,
+        messages: [
+          { role: 'system', content: getDialSystem() },
+          ...msgs
+        ]
+      })
+    });
+    const d = await res.json();
+    const reply = d.choices?.[0]?.message?.content || '…';
+    thinking.remove();
+    dialHistory.push({ role: 'assistant', content: reply });
+    addDialMsg('assistant', reply);
+  } catch(err) {
+    thinking.remove();
+    addDialMsg('assistant', '⚠️ Connection error. Please try again.');
+    console.error(err);
+  }
+  btn.disabled = false;
+}
+// ─────────────────────────────────────────────────────────────
 
 async function correctPhraseInline(btn, text) {
   if (!text) { showToast('Aucune phrase à corriger'); return; }
