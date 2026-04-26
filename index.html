@@ -595,7 +595,8 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
           <!-- Input -->
           <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:4px;">
-            <textarea id="dial-input" placeholder="Type your message in English…" rows="2" style="flex:1;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;resize:none;font-family:inherit;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDialogue();}"></textarea>
+            <button id="dial-mic-btn" onclick="toggleDialMic()" title="Parler en anglais" style="padding:10px 13px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--surface);font-size:20px;cursor:pointer;flex-shrink:0;align-self:stretch;transition:all .2s;">🎤</button>
+            <textarea id="dial-input" placeholder="Speak 🎤 or type your message…" rows="2" style="flex:1;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;resize:none;font-family:inherit;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDialogue();}"></textarea>
             <button onclick="sendDialogue()" id="dial-send-btn" style="padding:10px 16px;border-radius:var(--radius);border:none;background:var(--blue);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;align-self:stretch;">➤</button>
           </div>
         </div>
@@ -2287,6 +2288,81 @@ async function sendDialogue() {
     console.error(err);
   }
   btn.disabled = false;
+}
+
+// ── DIALOGUE MICRO ────────────────────────────────────────────
+let dialRecognition = null;
+let dialMicActive = false;
+
+function toggleDialMic() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('Micro non supporté sur ce navigateur. Utilisez Chrome.');
+    return;
+  }
+  if (dialMicActive) {
+    stopDialMic();
+  } else {
+    startDialMic();
+  }
+}
+
+function startDialMic() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  dialRecognition = new SpeechRecognition();
+  dialRecognition.lang = 'en-GB';
+  dialRecognition.continuous = false;
+  dialRecognition.interimResults = true;
+
+  const btn = document.getElementById('dial-mic-btn');
+  const input = document.getElementById('dial-input');
+
+  dialRecognition.onstart = () => {
+    dialMicActive = true;
+    btn.textContent = '🔴';
+    btn.style.borderColor = '#e74c3c';
+    btn.style.background = 'rgba(231,76,60,.1)';
+    input.placeholder = 'Listening… speak in English';
+  };
+
+  dialRecognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    input.value = (final || interim).trim();
+  };
+
+  dialRecognition.onend = () => {
+    dialMicActive = false;
+    btn.textContent = '🎤';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'var(--surface)';
+    input.placeholder = 'Speak 🎤 or type your message…';
+    // Auto-send if something was captured
+    if (input.value.trim()) {
+      setTimeout(sendDialogue, 300);
+    }
+  };
+
+  dialRecognition.onerror = (e) => {
+    dialMicActive = false;
+    btn.textContent = '🎤';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'var(--surface)';
+    if (e.error === 'not-allowed') showToast('Accès au micro refusé. Autorisez le micro dans Chrome.');
+    else if (e.error !== 'no-speech') showToast('Erreur micro : ' + e.error);
+  };
+
+  dialRecognition.start();
+}
+
+function stopDialMic() {
+  if (dialRecognition) {
+    dialRecognition.stop();
+    dialRecognition = null;
+  }
 }
 // ─────────────────────────────────────────────────────────────
 
