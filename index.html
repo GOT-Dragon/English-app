@@ -1655,12 +1655,13 @@ function addFromTrad(engWord, frWord) {
 // ═══════════════════════════════════════════
 // SOUND — Web Speech API
 // ═══════════════════════════════════════════
-function speak(text, lang) {
+function speak(text, lang, onDone) {
   if (!window.speechSynthesis) { showToast('Son non supporté sur cet appareil'); return; }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang === 'en' ? 'en-GB' : 'fr-FR';
   u.rate = 0.9;
+  if (onDone) u.onend = onDone;
   window.speechSynthesis.speak(u);
 }
 
@@ -2183,6 +2184,10 @@ function getDialSystem() {
 
 function resetDialogue() {
   dialHistory = [];
+  dialAutoListen = false;
+  window.speechSynthesis.cancel();
+  stopDialMic();
+  updateMicBtn('idle');
   const box = document.getElementById('dial-messages');
   box.innerHTML = '';
   // Show starter message
@@ -2226,8 +2231,12 @@ function addDialMsg(role, text) {
     audio.onclick = () => speak(spokenText, 'en');
     div.appendChild(bubble);
     div.appendChild(audio);
-    // Auto-play after a short delay so the bubble renders first
-    setTimeout(() => speak(spokenText, 'en'), 200);
+    // Auto-play, then restart mic automatically if dialogue mic mode is on
+    setTimeout(() => {
+      speak(spokenText, 'en', () => {
+        if (dialAutoListen) setTimeout(startDialMic, 400);
+      });
+    }, 200);
   } else {
     div.appendChild(bubble);
   }
@@ -2308,16 +2317,47 @@ async function sendDialogue() {
 // ── DIALOGUE MICRO ────────────────────────────────────────────
 let dialRecognition = null;
 let dialMicActive = false;
+let dialAutoListen = false; // true = mic auto-restarts after AI speaks
 
 function toggleDialMic() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
     showToast('Micro non supporté sur ce navigateur. Utilisez Chrome.');
     return;
   }
-  if (dialMicActive) {
+  if (dialAutoListen || dialMicActive) {
+    // Stop everything
+    dialAutoListen = false;
     stopDialMic();
+    window.speechSynthesis.cancel();
+    updateMicBtn('idle');
   } else {
+    // Start auto-listen mode
+    dialAutoListen = true;
     startDialMic();
+  }
+}
+
+function updateMicBtn(state) {
+  const btn = document.getElementById('dial-mic-btn');
+  const input = document.getElementById('dial-input');
+  if (state === 'listening') {
+    btn.textContent = '🔴';
+    btn.style.borderColor = '#e74c3c';
+    btn.style.background = 'rgba(231,76,60,.1)';
+    btn.title = 'Appuyez pour arrêter';
+    input.placeholder = 'Listening… speak in English';
+  } else if (state === 'waiting') {
+    btn.textContent = '⏳';
+    btn.style.borderColor = 'var(--amber,#f39c12)';
+    btn.style.background = 'rgba(243,156,18,.1)';
+    btn.title = "L'IA répond…";
+    input.placeholder = "L'IA répond…";
+  } else {
+    btn.textContent = '🎤';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'var(--surface)';
+    btn.title = 'Parler en anglais';
+    input.placeholder = 'Speak 🎤 or type your message…';
   }
 }
 
@@ -2328,15 +2368,11 @@ function startDialMic() {
   dialRecognition.continuous = false;
   dialRecognition.interimResults = true;
 
-  const btn = document.getElementById('dial-mic-btn');
   const input = document.getElementById('dial-input');
 
   dialRecognition.onstart = () => {
     dialMicActive = true;
-    btn.textContent = '🔴';
-    btn.style.borderColor = '#e74c3c';
-    btn.style.background = 'rgba(231,76,60,.1)';
-    input.placeholder = 'Listening… speak in English';
+    updateMicBtn('listening');
   };
 
   dialRecognition.onresult = (e) => {
@@ -2351,23 +2387,26 @@ function startDialMic() {
 
   dialRecognition.onend = () => {
     dialMicActive = false;
-    btn.textContent = '🎤';
-    btn.style.borderColor = 'var(--border)';
-    btn.style.background = 'var(--surface)';
-    input.placeholder = 'Speak 🎤 or type your message…';
-    // Auto-send if something was captured
     if (input.value.trim()) {
-      setTimeout(sendDialogue, 300);
+      updateMicBtn('waiting');
+      setTimeout(sendDialogue, 200);
+    } else if (!dialAutoListen) {
+      updateMicBtn('idle');
     }
   };
 
   dialRecognition.onerror = (e) => {
     dialMicActive = false;
-    btn.textContent = '🎤';
-    btn.style.borderColor = 'var(--border)';
-    btn.style.background = 'var(--surface)';
-    if (e.error === 'not-allowed') showToast('Accès au micro refusé. Autorisez le micro dans Chrome.');
-    else if (e.error !== 'no-speech') showToast('Erreur micro : ' + e.error);
+    if (e.error === 'not-allowed') {
+      dialAutoListen = false;
+      updateMicBtn('idle');
+      showToast('Accès au micro refusé. Autorisez le micro dans Chrome.');
+    } else if (e.error === 'no-speech' && dialAutoListen) {
+      setTimeout(startDialMic, 300); // Retry if no speech detected
+    } else if (e.error !== 'no-speech') {
+      updateMicBtn('idle');
+      showToast('Erreur micro : ' + e.error);
+    }
   };
 
   dialRecognition.start();
