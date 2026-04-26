@@ -587,6 +587,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
               <option value="debate">🗣️ Débat / opinion</option>
             </select>
             <button id="dial-lang-btn" onclick="toggleDialLang()" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--blue);background:var(--surface);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🇬🇧 EN only</button>
+            <button id="dial-reform-btn" onclick="toggleDialReform()" title="Propose une reformulation si tu fais une erreur" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--green);background:var(--surface);color:var(--green);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">✏️ Reformuler</button>
             <button onclick="resetDialogue()" style="padding:6px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text3);font-size:12px;cursor:pointer;">↺ Reset</button>
           </div>
 
@@ -2173,6 +2174,20 @@ function toggleDialLang() {
   }
 }
 
+let dialReformMode = false;
+
+function toggleDialReform() {
+  dialReformMode = !dialReformMode;
+  const btn = document.getElementById('dial-reform-btn');
+  if (dialReformMode) {
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#fff';
+  } else {
+    btn.style.background = 'var(--surface)';
+    btn.style.color = 'var(--green)';
+  }
+}
+
 function getDialSystem() {
   const mode = document.getElementById('dial-mode').value;
   const base = DIAL_SYSTEM[mode] || DIAL_SYSTEM.free;
@@ -2185,6 +2200,9 @@ function getDialSystem() {
 function resetDialogue() {
   dialHistory = [];
   dialAutoListen = false;
+  dialReformMode = false;
+  const reformBtn = document.getElementById('dial-reform-btn');
+  if (reformBtn) { reformBtn.style.background = 'var(--surface)'; reformBtn.style.color = 'var(--green)'; }
   window.speechSynthesis.cancel();
   stopDialMic();
   updateMicBtn('idle');
@@ -2221,17 +2239,35 @@ function addDialMsg(role, text) {
     }
   });
 
-  // Audio button for assistant + auto-play
   if (!isUser) {
+    // Click-to-translate
+    const spokenText = text.replace(/💡[^\n]+/g,'').trim();
+    const trad = document.createElement('div');
+    trad.style.cssText = 'display:none;font-size:12px;color:var(--text3);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);';
+    trad.textContent = '⏳ Traduction…';
+    bubble.appendChild(trad);
+    bubble.style.cursor = 'pointer';
+    bubble.title = 'Appuyer pour traduire';
+    bubble.onclick = async () => {
+      if (trad.style.display === 'none') {
+        trad.style.display = 'block';
+        if (trad.textContent === '⏳ Traduction…') {
+          trad.textContent = await dialTranslate(spokenText);
+        }
+      } else {
+        trad.style.display = 'none';
+      }
+    };
+
     const audio = document.createElement('button');
     audio.className = 'sound-btn';
     audio.style.cssText = 'font-size:13px;margin-top:4px;align-self:flex-start;';
     audio.textContent = '🔊';
-    const spokenText = text.replace(/💡[^\n]+/g,'').trim();
-    audio.onclick = () => speak(spokenText, 'en');
+    audio.onclick = (e) => { e.stopPropagation(); speak(spokenText, 'en'); };
     div.appendChild(bubble);
     div.appendChild(audio);
-    // Auto-play, then restart mic automatically if dialogue mic mode is on
+
+    // Auto-play then restart mic
     setTimeout(() => {
       speak(spokenText, 'en', () => {
         if (dialAutoListen) setTimeout(startDialMic, 400);
@@ -2242,6 +2278,52 @@ function addDialMsg(role, text) {
   }
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+}
+
+async function dialTranslate(text) {
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|fr`;
+    const r = await fetch(url);
+    const d = await r.json();
+    return '🇫🇷 ' + (d.responseData?.translatedText || 'Traduction indisponible');
+  } catch { return '🇫🇷 Traduction indisponible'; }
+}
+
+async function checkReformulation(text) {
+  const groqKey = localStorage.getItem('eng_groq_key') || '';
+  if (!groqKey || text.startsWith('⚠️')) return;
+  try {
+    const prompt = `You are an English writing coach for a French speaker. Analyse this English message:
+
+"${text}"
+
+If the English is already correct and natural, reply ONLY with: OK
+If there are grammar, vocabulary or style improvements, reply ONLY with this JSON (no markdown):
+{"better":"improved version in English","tip":"explication courte en français (max 12 mots)"}`;
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+      body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
+    });
+    const d = await res.json();
+    const raw = (d.choices?.[0]?.message?.content || '').trim();
+    if (raw === 'OK' || raw.startsWith('OK')) return;
+    const parsed = parseGroqJSON(raw);
+    if (!parsed?.better) return;
+    // Show reformulation bubble
+    const box = document.getElementById('dial-messages');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;';
+    const bubble = document.createElement('div');
+    bubble.style.cssText = 'max-width:85%;padding:8px 12px;border-radius:18px 18px 4px 18px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);font-size:13px;line-height:1.5;';
+    bubble.innerHTML = `<div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">✏️ Reformulation</div>
+      <div style="color:var(--text);">${parsed.better}</div>
+      ${parsed.tip ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;font-style:italic;">💡 ${parsed.tip}</div>` : ''}`;
+    div.appendChild(bubble);
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  } catch(e) { console.error(e); }
 }
 
 async function sendDialogue() {
@@ -2257,6 +2339,9 @@ async function sendDialogue() {
   btn.disabled = true;
   addDialMsg('user', text);
   dialHistory.push({ role: 'user', content: text });
+
+  // Reformulation check (async, non-blocking)
+  if (dialReformMode) checkReformulation(text);
 
   // Thinking indicator
   const box = document.getElementById('dial-messages');
