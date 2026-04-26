@@ -2216,15 +2216,18 @@ function addDialMsg(role, text) {
     }
   });
 
-  // Audio button for assistant
+  // Audio button for assistant + auto-play
   if (!isUser) {
     const audio = document.createElement('button');
     audio.className = 'sound-btn';
     audio.style.cssText = 'font-size:13px;margin-top:4px;align-self:flex-start;';
     audio.textContent = '🔊';
-    audio.onclick = () => speak(text.replace(/💡[^\n]+/g,''), 'en');
+    const spokenText = text.replace(/💡[^\n]+/g,'').trim();
+    audio.onclick = () => speak(spokenText, 'en');
     div.appendChild(bubble);
     div.appendChild(audio);
+    // Auto-play after a short delay so the bubble renders first
+    setTimeout(() => speak(spokenText, 'en'), 200);
   } else {
     div.appendChild(bubble);
   }
@@ -2259,7 +2262,19 @@ async function sendDialogue() {
     const groqKey = localStorage.getItem('eng_groq_key') || '';
     if (!groqKey) {
       thinking.remove();
-      addDialMsg('assistant', "⚠️ Please set your Groq API key in Settings to use the Dialogue feature.");
+      const msgDiv = document.createElement('div');
+      msgDiv.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:6px;';
+      const bubble = document.createElement('div');
+      bubble.style.cssText = 'max-width:85%;padding:10px 14px;border-radius:18px 18px 18px 4px;background:var(--surface2,#f0f4f8);color:var(--text);font-size:14px;line-height:1.5;';
+      bubble.textContent = '⚠️ Clé Groq manquante. Ajoute-la en 30 secondes sur console.groq.com (gratuit), puis sauvegarde-la dans les Paramètres ⚙️';
+      const openBtn = document.createElement('button');
+      openBtn.textContent = '⚙️ Ouvrir les Paramètres';
+      openBtn.style.cssText = 'padding:6px 14px;border-radius:20px;border:none;background:var(--blue);color:#fff;font-size:13px;cursor:pointer;font-weight:600;';
+      openBtn.onclick = openSettings;
+      msgDiv.appendChild(bubble);
+      msgDiv.appendChild(openBtn);
+      document.getElementById('dial-messages').appendChild(msgDiv);
+      document.getElementById('dial-messages').scrollTop = 9999;
       btn.disabled = false;
       return;
     }
@@ -2659,6 +2674,13 @@ function saveGroqKey() {
 
 function openSettings() {
   document.getElementById('settings-modal').classList.add('open');
+  // Show existing Groq key if set
+  const existingKey = localStorage.getItem('eng_groq_key') || '';
+  if (existingKey) {
+    document.getElementById('groq-key-input').value = existingKey;
+    document.getElementById('groq-key-status').textContent = '✓ Clé Groq active';
+    document.getElementById('groq-key-status').style.color = 'var(--green)';
+  }
   const custom = dicoData.filter(e => e.custom).length;
   document.getElementById('stats-dico').textContent = dicoData.length;
   document.getElementById('stats-phrase').textContent = phraseData.length;
