@@ -1491,23 +1491,50 @@ async function translate() {
   }
 
   try {
-    // 1. Main translation via MyMemory API (free, no key needed)
-    const langPair = `${srcLang}|${tgtLang}`;
-    const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${langPair}`;
-    const mmRes = await fetch(mmUrl);
-    if (!mmRes.ok) throw new Error('MyMemory error');
-    const mmData = await mmRes.json();
-    const mainTrans = mmData.responseData?.translatedText || '';
-    if (!mainTrans || mmData.responseStatus !== 200) throw new Error('No translation');
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    let mainTrans = '';
+    let alts = [];
 
-    // 2. Alternative translations from MyMemory matches
-    const matches = mmData.matches || [];
-    const alts = [...new Set(
-      matches
-        .filter(m => m.translation && m.translation.toLowerCase() !== mainTrans.toLowerCase())
-        .map(m => m.translation)
-        .slice(0, 6)
-    )];
+    if (groqKey) {
+      // 1. Groq translation — precise, handles phrasal verbs and expressions
+      const fromLabel = srcLang === 'en' ? 'English' : 'French';
+      const toLabel   = tgtLang === 'en' ? 'English' : 'French';
+      const prompt = `You are a professional ${fromLabel}→${toLabel} translator.
+Translate this text accurately, taking into account idiomatic expressions and phrasal verbs.
+TEXT: "${word}"
+Reply ONLY with this JSON (no markdown):
+{"main":"primary translation","alts":["alt1","alt2","alt3"]}
+- "main": best single translation
+- "alts": up to 3 alternative meanings if the word/phrase is polysemous, otherwise []
+- All values must be in ${toLabel}`;
+
+      const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
+      });
+      const gData = await gRes.json();
+      const parsed = parseGroqJSON(gData.choices?.[0]?.message?.content || '{}');
+      mainTrans = parsed?.main || '';
+      alts = parsed?.alts || [];
+      if (!mainTrans) throw new Error('Groq translation empty');
+    } else {
+      // Fallback: MyMemory API
+      const langPair = `${srcLang}|${tgtLang}`;
+      const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${langPair}`;
+      const mmRes = await fetch(mmUrl);
+      if (!mmRes.ok) throw new Error('MyMemory error');
+      const mmData = await mmRes.json();
+      mainTrans = mmData.responseData?.translatedText || '';
+      if (!mainTrans || mmData.responseStatus !== 200) throw new Error('No translation');
+      const matches = mmData.matches || [];
+      alts = [...new Set(
+        matches
+          .filter(m => m.translation && m.translation.toLowerCase() !== mainTrans.toLowerCase())
+          .map(m => m.translation)
+          .slice(0, 6)
+      )];
+    }
 
     // 3. Examples via Free Dictionary API (EN only — for phonetic + usage)
     let phonetic = '';
@@ -2282,6 +2309,21 @@ function addDialMsg(role, text) {
 
 async function dialTranslate(text) {
   try {
+    const groqKey = localStorage.getItem('eng_groq_key') || '';
+    if (groqKey) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: 150,
+          messages: [{ role: 'user', content: `Translate this English sentence to French. Reply with ONLY the French translation, nothing else:
+"${text}"` }]
+        })
+      });
+      const d = await res.json();
+      const tr = d.choices?.[0]?.message?.content?.trim() || '';
+      if (tr) return '🇫🇷 ' + tr;
+    }
+    // Fallback
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|fr`;
     const r = await fetch(url);
     const d = await r.json();
