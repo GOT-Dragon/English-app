@@ -1332,6 +1332,43 @@ function initQuiz() {
   qIdx=0;qScore=0;qAnswered=false;qResults=[];
   renderQ();
 }
+function cycleDebrief(el) {
+  const state = parseInt(el.dataset.state || '0');
+  const answer = el.querySelector('.debrief-answer');
+  const defBox = el.querySelector('.debrief-definition');
+  const next = (state + 1) % 3;
+  el.dataset.state = next;
+
+  if (next === 0) {
+    // Close all
+    answer.style.display = 'none';
+    defBox.style.display = 'none';
+  } else if (next === 1) {
+    // Show answer
+    answer.style.display = 'block';
+    defBox.style.display = 'none';
+  } else {
+    // Show answer + definition from dico
+    answer.style.display = 'block';
+    defBox.style.display = 'block';
+    if (!defBox.dataset.loaded) {
+      const word = el.dataset.word;
+      const entry = dicoData.find(d => d.word.toLowerCase() === word.toLowerCase())
+                 || phraseData.find(d => d.word.toLowerCase() === word.toLowerCase());
+      if (entry) {
+        let content = '';
+        if (entry.trans) content += `📖 ${entry.trans}`;
+        if (entry.en)    content += (content ? '<br>' : '') + `💬 ${entry.en}`;
+        if (entry.fr)    content += `<br>🇫🇷 ${entry.fr}`;
+        defBox.innerHTML = content || '—';
+      } else {
+        defBox.textContent = 'Définition non trouvée dans le dico.';
+      }
+      defBox.dataset.loaded = '1';
+    }
+  }
+}
+
 function renderQ() {
   const box=document.getElementById('quiz-box');
   if(qIdx>=qItems.length){
@@ -1346,13 +1383,15 @@ function renderQ() {
         : qMode==='reverse'
         ? `<strong>${r.item.trans}</strong> → ${r.item.word}`
         : `<strong>${r.item.word}</strong> : ${r.item.en}`;
-      return `<div class="debrief-item ${ok?'debrief-ok':'debrief-ko'}" onclick="this.querySelector('.debrief-answer').style.display=this.querySelector('.debrief-answer').style.display==='none'?'block':'none'">
+      const wordKey = r.item.word.replace(/'/g,"\\'");
+      return `<div class="debrief-item ${ok?'debrief-ok':'debrief-ko'}" data-state="0" data-word="${wordKey}" onclick="cycleDebrief(this)">
         <div class="debrief-header">
           <span class="debrief-icon">${ok?'✓':'✗'}</span>
           <span class="debrief-word">${label}</span>
           <span class="debrief-chosen">${ok?r.chosen:''+r.chosen+' → '+r.correct+''}</span>
         </div>
         <div class="debrief-answer" style="display:none;">${answerLine}</div>
+        <div class="debrief-definition" style="display:none;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);font-style:italic;"></div>
       </div>`;
     }).join('');
     box.innerHTML=`<div class="quiz-end">
