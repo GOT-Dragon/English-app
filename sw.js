@@ -1,60 +1,59 @@
-const CACHE_NAME = 'english-app-v7';
-const ASSETS = [
-  './index.html',
-  './manifest.json'
-];
+const CACHE_NAME = 'english-app-daughter-v1';
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE_NAME).then((cache) => {
+    return cache.addAll([
+      './',
+      './index.html',
+      './manifest.json'
+    ]).catch(() => {}); // Ignore errors if files don't exist yet
+  }));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((names) => {
+    return Promise.all(names.map((name) => {
+      if (!name.includes('daughter')) return Promise.resolve();
+      if (name !== CACHE_NAME) {
+        return caches.delete(name);
+      }
+    }));
+  }));
   self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  // APIs externes : réseau direct, jamais mis en cache
-  if (e.request.url.includes('dictionaryapi.dev') ||
-      e.request.url.includes('mymemory') ||
-      e.request.url.includes('supabase.co')) {
-    e.respondWith(fetch(e.request).catch(() =>
-      new Response('{"error":"offline"}', {headers:{'Content-Type':'application/json'}})
-    ));
-    return;
-  }
-
-  // index.html : réseau EN PRIORITÉ, cache seulement si hors ligne
-  if (e.request.mode === 'navigate' ||
-      e.request.url.endsWith('/') ||
-      e.request.url.includes('index.html')) {
+self.addEventListener('fetch', (e) => {
+  // Network-first for index.html (always get fresh)
+  if (e.request.url.endsWith('index.html') || e.request.url.endsWith('/')) {
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
+      fetch(e.request).then((resp) => {
+        if (resp.ok) {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, resp.clone());
+          });
+        }
+        return resp;
+      }).catch(() => {
+        return caches.match(e.request);
+      })
     );
     return;
   }
 
-  // Autres assets : cache d'abord
+  // Cache-first for everything else
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      if (res.status === 200) {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      }
-      return res;
-    }))
+    caches.match(e.request).then((cached) => {
+      return cached || fetch(e.request).then((resp) => {
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, resp.clone());
+          });
+        }
+        return resp;
+      }).catch(() => {
+        return new Response('Offline', { status: 503 });
+      });
+    })
   );
 });
