@@ -958,17 +958,70 @@ let qMode='dico', qItems=[], qIdx=0, qScore=0, qAnswered=false;
 let dictHistory=[];
 let deferredInstall=null;
 const PER=50;
-const LS_DICO='eng_dico_v2', LS_PHRASE='eng_phrase_v2', LS_HIST='eng_dict_hist';
+const LS_DICO='eng_dico_v3', LS_PHRASE='eng_phrase_v3', LS_HIST='eng_dict_hist';
 
 // ═══════════════════════════════════════════
 // STORAGE
 // ═══════════════════════════════════════════
 function loadData() {
   try {
+    // Base data
+    const baseDico   = BASE_DICO.map(([w,t])=>({word:w,trans:t,custom:false}));
+    const basePhrases = BASE_PHRASES.map(p=>({word:p.word,en:p.en,fr:p.fr||'',custom:false}));
+
+    // Check if v3 already exists
     const sd = localStorage.getItem(LS_DICO);
-    dicoData = sd ? JSON.parse(sd) : BASE_DICO.map(([w,t])=>({word:w,trans:t,custom:false}));
     const sp = localStorage.getItem(LS_PHRASE);
-    phraseData = sp ? JSON.parse(sp) : BASE_PHRASES.map(p=>({word:p.word,en:p.en,fr:p.fr||'',custom:false}));
+
+    if (!sd) {
+      // First run on v3 — try to migrate from v2
+      const oldDico   = localStorage.getItem('eng_dico_v2');
+      const oldPhrase = localStorage.getItem('eng_phrase_v2');
+      const oldWords  = oldDico ? JSON.parse(oldDico) : [];
+      const oldPhrases = oldPhrase ? JSON.parse(oldPhrase) : [];
+
+      // Merge: start from base, then overlay anything from old data
+      // Words: keep base, override trans if old has custom=true, add new custom words
+      const dicoMap = {};
+      baseDico.forEach(e => { dicoMap[e.word.toLowerCase()] = {...e}; });
+      oldWords.forEach(e => {
+        const key = e.word.toLowerCase();
+        if (dicoMap[key]) {
+          // Update trans if the old entry was custom-modified
+          if (e.custom) dicoMap[key] = {...dicoMap[key], trans: e.trans, custom: true};
+        } else {
+          // New custom word not in base — add it
+          dicoMap[key] = {...e, custom: true};
+        }
+      });
+      dicoData = Object.values(dicoMap);
+
+      // Phrases: start from base, add any old custom phrases not already there
+      const phraseMap = {};
+      basePhrases.forEach(p => { phraseMap[p.word.toLowerCase()] = {...p}; });
+      oldPhrases.forEach(p => {
+        const key = p.word.toLowerCase();
+        if (!phraseMap[key]) {
+          phraseMap[key] = {...p, custom: true};
+        } else if (p.custom && p.en) {
+          phraseMap[key] = {...phraseMap[key], en: p.en, fr: p.fr||'', custom: p.custom};
+        }
+      });
+      phraseData = Object.values(phraseMap);
+
+      // Save merged data to v3
+      localStorage.setItem(LS_DICO, JSON.stringify(dicoData));
+      localStorage.setItem(LS_PHRASE, JSON.stringify(phraseData));
+
+      const addedWords = dicoData.length - baseDico.length;
+      if (oldWords.length > 0) {
+        setTimeout(() => showToast(`✅ Restauration : ${dicoData.length} mots, ${phraseData.length} phrases fusionnés`), 1000);
+      }
+    } else {
+      dicoData = JSON.parse(sd);
+      phraseData = sp ? JSON.parse(sp) : basePhrases;
+    }
+
     const sh = localStorage.getItem(LS_HIST);
     dictHistory = sh ? JSON.parse(sh) : [];
   } catch(e) {
