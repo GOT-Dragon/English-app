@@ -3131,6 +3131,12 @@ function enterApp() {
 loadSupabaseConfig();
 loadData();
 loadProData();
+// Reset search/filter state on every load
+dicoFilter = '';
+dicoLetter = 'all';
+dicoPage = 1;
+const searchEl = document.getElementById('dico-search');
+if (searchEl) searchEl.value = '';
 renderDico();
 renderPhrases();
 renderPro();
