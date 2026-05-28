@@ -805,6 +805,12 @@ create policy "public access" on english_app for all using (true);</code>
           <div class="modal-label" style="color:var(--text3);font-size:12px;">Changer de compte Supabase</div>
           <button class="modal-btn danger" style="font-size:12px;padding:6px 12px;" onclick="disconnectSupabase()">Changer</button>
         </div>
+        <div class="modal-row" style="margin-top:4px;gap:6px;flex-wrap:wrap;">
+          <button class="modal-btn" style="font-size:12px;background:var(--amber,#f39c12);color:#fff;" onclick="diagSync()">🔍 Diagnostic</button>
+          <button class="modal-btn" style="font-size:12px;background:#c0392b;color:#fff;" onclick="forcePushSync()">⬆️ Force Push</button>
+          <button class="modal-btn" style="font-size:12px;background:#27ae60;color:#fff;" onclick="forcePullSync()">⬇️ Force Pull</button>
+        </div>
+        <div id="sync-diag-result" style="display:none;font-size:12px;color:var(--text2);margin-top:8px;padding:8px;background:var(--surface2);border-radius:var(--radius);line-height:1.7;"></div>
       </div>
     </div>
 
@@ -2899,6 +2905,96 @@ async function syncFromCloud() {
   } catch(e) {
     setSyncStatus('error', 'Sync échouée');
     console.warn('Pull error:', e);
+  }
+}
+
+
+async function diagSync() {
+  const box = document.getElementById('sync-diag-result');
+  box.style.display = 'block';
+  box.innerHTML = '⏳ Récupération des données cloud...';
+  try {
+    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=*`, {
+      headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey }
+    });
+    const rows = await r.json();
+    const row = rows?.[0];
+    if (!row) { box.innerHTML = '❌ Aucune donnée dans le cloud'; return; }
+    const cloudCustomDico   = row.dico   ? JSON.parse(row.dico).length   : 0;
+    const cloudCustomPhrases = row.phrases ? JSON.parse(row.phrases).length : 0;
+    const localCustomDico   = dicoData.filter(e => e.custom).length;
+    const localCustomPhrases = phraseData.filter(e => e.custom).length;
+    const cloudUpdated = new Date(row.updated_at).toLocaleString('fr-FR');
+    box.innerHTML =
+      `<b>☁️ Cloud</b> : ${cloudCustomDico} mots custom, ${cloudCustomPhrases} phrases custom<br>` +
+      `<b>💾 Local</b> : ${localCustomDico} mots custom, ${localCustomPhrases} phrases custom<br>` +
+      `<b>📊 Total local</b> : ${dicoData.length} mots, ${phraseData.length} phrases<br>` +
+      `<b>🕐 Dernière MAJ cloud</b> : ${cloudUpdated}`;
+  } catch(e) {
+    box.innerHTML = '❌ Erreur : ' + e.message;
+  }
+}
+
+async function forcePushSync() {
+  const box = document.getElementById('sync-diag-result');
+  box.style.display = 'block';
+  box.innerHTML = '⬆️ Push en cours...';
+  try {
+    const payload = {
+      user_id: sbUid,
+      dico: JSON.stringify(dicoData.filter(e => e.custom)),
+      phrases: JSON.stringify(phraseData.filter(e => e.custom)),
+      pro: JSON.stringify(proData),
+      dict_history: JSON.stringify(dictHistory),
+      updated_at: new Date().toISOString()
+    };
+    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`, {
+      method: 'POST',
+      headers: { ...sbHeaders(), 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) { const err = await r.text(); throw new Error(`HTTP ${r.status}: ${err}`); }
+    const customDico = dicoData.filter(e => e.custom).length;
+    const customPhrases = phraseData.filter(e => e.custom).length;
+    box.innerHTML = `✅ Poussé : ${customDico} mots custom, ${customPhrases} phrases custom`;
+    setSyncStatus('ok', new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
+  } catch(e) {
+    box.innerHTML = '❌ Erreur push : ' + e.message;
+    console.error(e);
+  }
+}
+
+async function forcePullSync() {
+  const box = document.getElementById('sync-diag-result');
+  box.style.display = 'block';
+  box.innerHTML = '⬇️ Pull en cours...';
+  try {
+    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=*`, {
+      headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey }
+    });
+    const rows = await r.json();
+    const row = rows?.[0];
+    if (!row) { box.innerHTML = '❌ Aucune donnée dans le cloud'; return; }
+    // Merge cloud → local
+    if (row.dico) {
+      const cloudCustom = JSON.parse(row.dico);
+      const localMap = {};
+      dicoData.filter(e => e.custom).forEach(e => { localMap[e.word.toLowerCase()] = e; });
+      cloudCustom.forEach(e => { localMap[e.word.toLowerCase()] = { ...e, custom: true }; });
+      dicoData = [...dicoData.filter(e => !e.custom), ...Object.values(localMap)];
+    }
+    if (row.phrases) {
+      const cloudPhrases = JSON.parse(row.phrases);
+      const localMap = {};
+      phraseData.filter(e => e.custom).forEach(e => { localMap[e.word.toLowerCase()] = e; });
+      cloudPhrases.forEach(e => { localMap[e.word.toLowerCase()] = { ...e, custom: true }; });
+      phraseData = [...phraseData.filter(e => !e.custom), ...Object.values(localMap)];
+    }
+    saveData(); renderDico(); renderPhrases();
+    box.innerHTML = `✅ Fusionné : ${dicoData.length} mots total (${dicoData.filter(e=>e.custom).length} custom)`;
+  } catch(e) {
+    box.innerHTML = '❌ Erreur pull : ' + e.message;
+    console.error(e);
   }
 }
 
