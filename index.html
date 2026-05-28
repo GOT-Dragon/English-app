@@ -428,7 +428,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <!-- DICO -->
       <div class="sub-section active" id="v-dico">
         <div class="search-wrap">
-          <input class="search-input" id="dico-search" placeholder="Chercher un mot ou traduction..." oninput="filterDico()" autocomplete="off">
+          <input class="search-input" id="dico-search" placeholder="Chercher un mot ou traduction..." oninput="filterDico()" autocomplete="new-password">
           <button class="btn-primary" onclick="toggleAddForm('dico-form')">+</button>
         </div>
         <div class="add-form" id="dico-form">
@@ -3319,11 +3319,15 @@ dicoPage = 1;
 const searchEl = document.getElementById('dico-search');
 if (searchEl) searchEl.value = '';
 renderDico();
-// Clear again after browser session restore (runs after JS init)
-setTimeout(() => {
+// Clear after browser session restore — multiple passes to be safe
+function clearDicoSearch() {
   const s = document.getElementById('dico-search');
   if (s && s.value) { s.value = ''; dicoFilter = ''; renderDico(); }
-}, 200);
+}
+setTimeout(clearDicoSearch, 100);
+setTimeout(clearDicoSearch, 500);
+setTimeout(clearDicoSearch, 1000);
+window.addEventListener('pageshow', clearDicoSearch);
 renderPhrases();
 renderPro();
 initQuiz();
