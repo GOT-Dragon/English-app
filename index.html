@@ -2889,7 +2889,8 @@ async function syncFromCloud() {
       renderDico();
       renderPhrases();
       renderPro();
-      showToast('Données synchronisées ✓');
+      const customCount = dicoData.filter(e=>e.custom).length;
+      showToast(`Sync OK — ${dicoData.length} mots (${customCount} perso)`);
     }
 
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});

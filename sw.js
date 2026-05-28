@@ -1,13 +1,8 @@
-const CACHE_NAME = 'english-app-v8';
-const ASSETS = [
-  './index.html',
-  './manifest.json'
-];
+const CACHE_NAME = 'english-app-v9';
+const ASSETS = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
@@ -21,40 +16,24 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // APIs externes : réseau direct, jamais mis en cache
-  if (e.request.url.includes('dictionaryapi.dev') ||
+  if (e.request.url.includes('supabase.co') ||
+      e.request.url.includes('groq.com') ||
       e.request.url.includes('mymemory') ||
-      e.request.url.includes('supabase.co')) {
-    e.respondWith(fetch(e.request).catch(() =>
-      new Response('{"error":"offline"}', {headers:{'Content-Type':'application/json'}})
-    ));
+      e.request.url.includes('dictionaryapi')) {
+    e.respondWith(fetch(e.request));
     return;
   }
-
-  // index.html : réseau EN PRIORITÉ, cache seulement si hors ligne
-  if (e.request.mode === 'navigate' ||
-      e.request.url.endsWith('/') ||
-      e.request.url.includes('index.html')) {
+  if (e.request.mode === 'navigate' || e.request.url.includes('index.html')) {
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => caches.match(e.request))
     );
     return;
   }
-
-  // Autres assets : cache d'abord
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      if (res.status === 200) {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      }
-      return res;
-    }))
+    caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
