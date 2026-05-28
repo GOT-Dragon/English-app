@@ -2795,10 +2795,11 @@ async function syncToCloud() {
   if (!sbUrl || !sbKey) return;
   setSyncStatus('syncing');
   try {
+    // Push ALL words (not just custom) — ensures full sync across devices
     const payload = {
       user_id: sbUid,
-      dico: JSON.stringify(dicoData.filter(e => e.custom)),
-      phrases: JSON.stringify(phraseData.filter(e => e.custom)),
+      dico: JSON.stringify(dicoData),
+      phrases: JSON.stringify(phraseData),
       pro: JSON.stringify(proData),
       dict_history: JSON.stringify(dictHistory),
       updated_at: new Date().toISOString()
@@ -2837,38 +2838,34 @@ async function syncFromCloud() {
     let changed = false;
 
     if (row.dico) {
-      const cloudCustom = JSON.parse(row.dico);
-      // Build map from local custom entries
-      const localMap = {};
-      dicoData.filter(e => e.custom).forEach(e => {
-        localMap[e.word.toLowerCase()] = e;
-      });
-      // Cloud entries override local on conflict
-      cloudCustom.forEach(e => {
-        localMap[e.word.toLowerCase()] = { ...e, custom: true };
-      });
-      // Rebuild: base entries + merged custom entries
-      dicoData = [
-        ...dicoData.filter(e => !e.custom),
-        ...Object.values(localMap)
-      ];
-      changed = true;
+      const cloudDico = JSON.parse(row.dico);
+      // Safety: only replace if cloud has more words than local, or significantly populated
+      // Never replace with stale/partial cloud data
+      if (cloudDico.length > dicoData.length || cloudDico.length > 1500) {
+        dicoData = cloudDico;
+        changed = true;
+      } else if (cloudDico.length > 0) {
+        // Merge: union of local + cloud
+        const map = {};
+        dicoData.forEach(e => { map[e.word.toLowerCase()] = e; });
+        cloudDico.forEach(e => { map[e.word.toLowerCase()] = e; });
+        dicoData = Object.values(map);
+        changed = true;
+      }
     }
 
     if (row.phrases) {
       const cloudPhrases = JSON.parse(row.phrases);
-      const localPhraseMap = {};
-      phraseData.filter(e => e.custom).forEach(e => {
-        localPhraseMap[e.word.toLowerCase()] = e;
-      });
-      cloudPhrases.forEach(e => {
-        localPhraseMap[e.word.toLowerCase()] = { ...e, custom: true };
-      });
-      phraseData = [
-        ...phraseData.filter(e => !e.custom),
-        ...Object.values(localPhraseMap)
-      ];
-      changed = true;
+      if (cloudPhrases.length > phraseData.length || cloudPhrases.length > 200) {
+        phraseData = cloudPhrases;
+        changed = true;
+      } else if (cloudPhrases.length > 0) {
+        const map = {};
+        phraseData.forEach(e => { map[e.word.toLowerCase()] = e; });
+        cloudPhrases.forEach(e => { map[e.word.toLowerCase()] = e; });
+        phraseData = Object.values(map);
+        changed = true;
+      }
     }
 
     if (row.pro) {
@@ -2925,10 +2922,11 @@ async function diagSync() {
     const localCustomDico   = dicoData.filter(e => e.custom).length;
     const localCustomPhrases = phraseData.filter(e => e.custom).length;
     const cloudUpdated = new Date(row.updated_at).toLocaleString('fr-FR');
+    const cloudTotalDico = row.dico ? JSON.parse(row.dico).length : 0;
+    const cloudTotalPhrases = row.phrases ? JSON.parse(row.phrases).length : 0;
     box.innerHTML =
-      `<b>☁️ Cloud</b> : ${cloudCustomDico} mots custom, ${cloudCustomPhrases} phrases custom<br>` +
-      `<b>💾 Local</b> : ${localCustomDico} mots custom, ${localCustomPhrases} phrases custom<br>` +
-      `<b>📊 Total local</b> : ${dicoData.length} mots, ${phraseData.length} phrases<br>` +
+      `<b>☁️ Cloud total</b> : ${cloudTotalDico} mots, ${cloudTotalPhrases} phrases<br>` +
+      `<b>💾 Local total</b> : ${dicoData.length} mots, ${phraseData.length} phrases<br>` +
       `<b>🕐 Dernière MAJ cloud</b> : ${cloudUpdated}`;
   } catch(e) {
     box.innerHTML = '❌ Erreur : ' + e.message;
@@ -2940,10 +2938,11 @@ async function forcePushSync() {
   box.style.display = 'block';
   box.innerHTML = '⬆️ Push en cours...';
   try {
+    // Push ALL words (not just custom) — ensures full sync across devices
     const payload = {
       user_id: sbUid,
-      dico: JSON.stringify(dicoData.filter(e => e.custom)),
-      phrases: JSON.stringify(phraseData.filter(e => e.custom)),
+      dico: JSON.stringify(dicoData),
+      phrases: JSON.stringify(phraseData),
       pro: JSON.stringify(proData),
       dict_history: JSON.stringify(dictHistory),
       updated_at: new Date().toISOString()
@@ -2956,7 +2955,7 @@ async function forcePushSync() {
     if (!r.ok) { const err = await r.text(); throw new Error(`HTTP ${r.status}: ${err}`); }
     const customDico = dicoData.filter(e => e.custom).length;
     const customPhrases = phraseData.filter(e => e.custom).length;
-    box.innerHTML = `✅ Poussé : ${customDico} mots custom, ${customPhrases} phrases custom`;
+    box.innerHTML = `✅ Poussé : ${dicoData.length} mots, ${phraseData.length} phrases`;
     setSyncStatus('ok', new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
   } catch(e) {
     box.innerHTML = '❌ Erreur push : ' + e.message;
@@ -2977,21 +2976,29 @@ async function forcePullSync() {
     if (!row) { box.innerHTML = '❌ Aucune donnée dans le cloud'; return; }
     // Merge cloud → local
     if (row.dico) {
-      const cloudCustom = JSON.parse(row.dico);
-      const localMap = {};
-      dicoData.filter(e => e.custom).forEach(e => { localMap[e.word.toLowerCase()] = e; });
-      cloudCustom.forEach(e => { localMap[e.word.toLowerCase()] = { ...e, custom: true }; });
-      dicoData = [...dicoData.filter(e => !e.custom), ...Object.values(localMap)];
+      const cloudDico = JSON.parse(row.dico);
+      if (cloudDico.length > 1500) {
+        dicoData = cloudDico; // full replace only if cloud is complete
+      } else if (cloudDico.length > 0) {
+        const map = {};
+        dicoData.forEach(e => { map[e.word.toLowerCase()] = e; });
+        cloudDico.forEach(e => { map[e.word.toLowerCase()] = e; });
+        dicoData = Object.values(map);
+      }
     }
     if (row.phrases) {
       const cloudPhrases = JSON.parse(row.phrases);
-      const localMap = {};
-      phraseData.filter(e => e.custom).forEach(e => { localMap[e.word.toLowerCase()] = e; });
-      cloudPhrases.forEach(e => { localMap[e.word.toLowerCase()] = { ...e, custom: true }; });
-      phraseData = [...phraseData.filter(e => !e.custom), ...Object.values(localMap)];
+      if (cloudPhrases.length > 200) {
+        phraseData = cloudPhrases;
+      } else if (cloudPhrases.length > 0) {
+        const map = {};
+        phraseData.forEach(e => { map[e.word.toLowerCase()] = e; });
+        cloudPhrases.forEach(e => { map[e.word.toLowerCase()] = e; });
+        phraseData = Object.values(map);
+      }
     }
     saveData(); renderDico(); renderPhrases();
-    box.innerHTML = `✅ Fusionné : ${dicoData.length} mots total (${dicoData.filter(e=>e.custom).length} custom)`;
+    box.innerHTML = `✅ Récupéré : ${dicoData.length} mots, ${phraseData.length} phrases`;
   } catch(e) {
     box.innerHTML = '❌ Erreur pull : ' + e.message;
     console.error(e);
