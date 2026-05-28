@@ -1013,8 +1013,9 @@ function loadData() {
       localStorage.setItem(LS_DICO, JSON.stringify(dicoData));
       localStorage.setItem(LS_PHRASE, JSON.stringify(phraseData));
 
-      const addedWords = dicoData.length - baseDico.length;
       if (oldWords.length > 0) {
+        // Flag so startup sync pushes first instead of pulling
+        localStorage.setItem('eng_just_migrated', '1');
         setTimeout(() => showToast(`✅ Restauration : ${dicoData.length} mots, ${phraseData.length} phrases fusionnés`), 1000);
       }
     } else {
@@ -2825,21 +2826,42 @@ async function syncFromCloud() {
     const cloudTime = new Date(row.updated_at).getTime();
     const localPushed = new Date(localStorage.getItem('eng_sb_pushed_at') || 0).getTime();
 
-    // Always apply cloud data — replace local custom entries entirely with cloud
+    // MERGE strategy: union of local + cloud custom entries
+    // Cloud wins on conflict (same word key), but local-only entries are preserved
     let changed = false;
 
     if (row.dico) {
       const cloudCustom = JSON.parse(row.dico);
-      // Remove old local custom entries, replace with cloud ones
-      dicoData = dicoData.filter(e => !e.custom);
-      cloudCustom.forEach(e => { e.custom = true; dicoData.unshift(e); });
+      // Build map from local custom entries
+      const localMap = {};
+      dicoData.filter(e => e.custom).forEach(e => {
+        localMap[e.word.toLowerCase()] = e;
+      });
+      // Cloud entries override local on conflict
+      cloudCustom.forEach(e => {
+        localMap[e.word.toLowerCase()] = { ...e, custom: true };
+      });
+      // Rebuild: base entries + merged custom entries
+      dicoData = [
+        ...dicoData.filter(e => !e.custom),
+        ...Object.values(localMap)
+      ];
       changed = true;
     }
 
     if (row.phrases) {
       const cloudPhrases = JSON.parse(row.phrases);
-      phraseData = phraseData.filter(e => !e.custom);
-      cloudPhrases.forEach(e => { e.custom = true; phraseData.unshift(e); });
+      const localPhraseMap = {};
+      phraseData.filter(e => e.custom).forEach(e => {
+        localPhraseMap[e.word.toLowerCase()] = e;
+      });
+      cloudPhrases.forEach(e => {
+        localPhraseMap[e.word.toLowerCase()] = { ...e, custom: true };
+      });
+      phraseData = [
+        ...phraseData.filter(e => !e.custom),
+        ...Object.values(localPhraseMap)
+      ];
       changed = true;
     }
 
@@ -2882,10 +2904,11 @@ async function syncFromCloud() {
 async function syncNow() {
   const btn = document.getElementById('btn-sync-now');
   if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-  await syncFromCloud();
-  await syncToCloud();
+  await syncFromCloud(); // 1. merge cloud → local
+  await syncToCloud();   // 2. push union back to cloud
   if (btn) { btn.textContent = '🔄 Sync'; btn.disabled = false; }
-  showToast('Synchronisation effectuée !');
+  const total = dicoData.length;
+  showToast(`Synchronisation effectuée ! (${total} mots)`);
 }
 
 // Debounced auto-sync: called after every data change
@@ -3116,9 +3139,15 @@ initSplash();
 
 // Pull from cloud on startup (silent, after render)
 if (sbUrl && sbKey) {
-  // Sync après 5s — laisse le temps au réseau et au splash screen
-  setTimeout(() => syncFromCloud(), 5000);
-  // Sync périodique toutes les 5 minutes
+  setTimeout(async () => {
+    if (localStorage.getItem('eng_just_migrated') === '1') {
+      localStorage.removeItem('eng_just_migrated');
+      await syncToCloud(); // migration vient d'avoir lieu : on pousse d'abord
+      setTimeout(() => showToast('✅ Données restaurées synchronisées vers le cloud'), 500);
+    } else {
+      await syncFromCloud(); // comportement normal
+    }
+  }, 3000);
   setInterval(() => syncToCloud(), 5 * 60 * 1000);
 }
 </script>
