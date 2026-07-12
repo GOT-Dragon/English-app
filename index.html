@@ -2734,27 +2734,28 @@ function loadSupabaseConfig() {
 }
 
 function sbHeaders() {
-  return { 'Content-Type': 'application/json', 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey, 'Prefer': 'resolution=merge-duplicates' };
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sbKey, 'Accept': 'application/vnd.github+json' };
 }
 
 async function saveSupabaseConfig() {
-  const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
-  const key = document.getElementById('sb-key').value.trim();
-  if (!url || !key) { showToast('Remplissez les deux champs'); return; }
+  const gistId = document.getElementById('sb-url').value.trim();
+  const token = document.getElementById('sb-key').value.trim();
+  if (!gistId || !token) { showToast('Remplissez les deux champs'); return; }
   setSyncStatus('connecting');
   try {
-    // Test connection with a simple query
-    const r = await fetch(`${url}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=user_id`, { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key } });
-    if (!r.ok && r.status !== 406) throw new Error(`Erreur ${r.status}`);
-    sbUrl = url; sbKey = key;
+    const r = await fetch('https://api.github.com/gists/' + gistId, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('Erreur ' + r.status);
+    sbUrl = gistId; sbKey = token;
     localStorage.setItem(LS_SB_URL, sbUrl);
     localStorage.setItem(LS_SB_KEY, sbKey);
+    localStorage.setItem('eng_gist_id', gistId);
+    localStorage.setItem('eng_gist_token', token);
     showSupabaseConnected();
-    await syncFromCloud(); // pull first
-    await syncToCloud();   // then push
-    showToast('Supabase connecté ! Sync active ✓');
+    await syncFromCloud();
+    await syncToCloud();
+    showToast('Gist connecte ! Sync active');
   } catch(e) {
-    setSyncStatus('error', 'Connexion échouée : ' + e.message);
+    setSyncStatus('error', 'Connexion echouee : ' + e.message);
     showToast('Erreur connexion : ' + e.message);
   }
 }
@@ -2781,49 +2782,31 @@ function showSupabaseConnected() {
 }
 
 function disconnectSupabase() {
-  if (!confirm('Déconnecter Supabase ? Vos données restent en local.')) return;
+  if (!confirm('Deconnecter le Gist ? Vos donnees restent en local.')) return;
   sbUrl = ''; sbKey = '';
   localStorage.removeItem(LS_SB_URL);
   localStorage.removeItem(LS_SB_KEY);
   localStorage.removeItem(LS_SB_LAST);
+  localStorage.removeItem('eng_gist_id');
+  localStorage.removeItem('eng_gist_token');
   document.getElementById('supabase-connected').style.display = 'none';
   document.getElementById('supabase-config-wrap').style.display = 'block';
-  setSyncStatus('off');
-  showToast('Supabase déconnecté');
+  showToast('Gist deconnecte');
 }
 
 async function syncToCloud() {
   if (!sbUrl || !sbKey) return;
   setSyncStatus('syncing');
   try {
-    // Push ALL words (not just custom) — ensures full sync across devices
-    const payload = {
-      user_id: sbUid,
-      dico: JSON.stringify(dicoData),
-      phrases: JSON.stringify(phraseData),
-      pro: JSON.stringify(proData),
-      dict_history: JSON.stringify(dictHistory),
-      updated_at: new Date().toISOString()
-    };
-    // Use PATCH (update) — reliable upsert without needing UNIQUE constraint
-    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}`, {
-      method: 'PATCH', headers: sbHeaders(), body: JSON.stringify(payload)
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
-    // If no row existed (PATCH updated 0 rows), create with POST
-    const count = r.headers.get('content-range');
-    if (count === '*/0' || r.status === 204) {
-      const r2 = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`, {
-        method: 'POST', headers: sbHeaders(), body: JSON.stringify(payload)
-      });
-      if (!r2.ok) throw new Error(`Insert failed: ${r2.status}`);
-    }
+    const payload = { dico: JSON.stringify(dicoData), phrases: JSON.stringify(phraseData), pro: JSON.stringify(proData), dict_history: JSON.stringify(dictHistory), updated_at: new Date().toISOString() };
+    const r = await fetch('https://api.github.com/gists/' + sbUrl, { method: 'PATCH', headers: sbHeaders(), body: JSON.stringify({ files: { 'english_app_data.json': { content: JSON.stringify(payload) } } }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     localStorage.setItem(LS_SB_LAST, now);
     localStorage.setItem('eng_sb_pushed_at', new Date().toISOString());
     setSyncStatus('ok', now);
   } catch(e) {
-    setSyncStatus('error', 'Sync échouée');
+    setSyncStatus('error', 'Sync echouee');
     console.warn('Sync error:', e);
   }
 }
@@ -2831,31 +2814,17 @@ async function syncToCloud() {
 async function syncFromCloud() {
   if (!sbUrl || !sbKey) return;
   try {
-    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=*`, {
-      headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey }
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const rows = await r.json();
-    if (!rows || rows.length === 0) return;
-    const row = rows[0];
-
-    // Compare cloud updated_at vs local last push
-    const cloudTime = new Date(row.updated_at).getTime();
-    const localPushed = new Date(localStorage.getItem('eng_sb_pushed_at') || 0).getTime();
-
-    // MERGE strategy: union of local + cloud custom entries
-    // Cloud wins on conflict (same word key), but local-only entries are preserved
+    const r = await fetch('https://api.github.com/gists/' + sbUrl, { headers: { 'Authorization': 'Bearer ' + sbKey, 'Accept': 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const gist = await r.json();
+    const file = gist.files && gist.files['english_app_data.json'];
+    if (!file) return;
+    const row = JSON.parse(file.content);
     let changed = false;
-
     if (row.dico) {
       const cloudDico = JSON.parse(row.dico);
-      // Safety: only replace if cloud has more words than local, or significantly populated
-      // Never replace with stale/partial cloud data
-      if (cloudDico.length > dicoData.length || cloudDico.length > 1500) {
-        dicoData = cloudDico;
-        changed = true;
-      } else if (cloudDico.length > 0) {
-        // Merge: union of local + cloud
+      if (cloudDico.length > dicoData.length || cloudDico.length > 1500) { dicoData = cloudDico; changed = true; }
+      else if (cloudDico.length > 0) {
         const map = {};
         dicoData.forEach(e => { map[e.word.toLowerCase()] = e; });
         cloudDico.forEach(e => { map[e.word.toLowerCase()] = e; });
@@ -2863,13 +2832,10 @@ async function syncFromCloud() {
         changed = true;
       }
     }
-
     if (row.phrases) {
       const cloudPhrases = JSON.parse(row.phrases);
-      if (cloudPhrases.length > phraseData.length || cloudPhrases.length > 200) {
-        phraseData = cloudPhrases;
-        changed = true;
-      } else if (cloudPhrases.length > 0) {
+      if (cloudPhrases.length > phraseData.length || cloudPhrases.length > 200) { phraseData = cloudPhrases; changed = true; }
+      else if (cloudPhrases.length > 0) {
         const map = {};
         phraseData.forEach(e => { map[e.word.toLowerCase()] = e; });
         cloudPhrases.forEach(e => { map[e.word.toLowerCase()] = e; });
@@ -2877,15 +2843,11 @@ async function syncFromCloud() {
         changed = true;
       }
     }
-
     if (row.pro) {
       const cloudPro = JSON.parse(row.pro);
-      // Merge pro categories — cloud wins for custom items
       Object.entries(cloudPro).forEach(([cat, items]) => {
-        if (!proData[cat]) {
-          proData[cat] = items;
-        } else {
-          // Keep base items, replace custom ones with cloud
+        if (!proData[cat]) { proData[cat] = items; }
+        else {
           const baseItems = proData[cat].filter(i => !(typeof i === 'object' && i.custom));
           const cloudCustomItems = items.filter(i => typeof i === 'object' && i.custom);
           proData[cat] = [...baseItems, ...cloudCustomItems];
@@ -2893,24 +2855,16 @@ async function syncFromCloud() {
         changed = true;
       });
     }
-
     if (row.dict_history) dictHistory = JSON.parse(row.dict_history);
-
     if (changed) {
-      saveData();
-      saveProData();
-      renderDico();
-      renderPhrases();
-      renderPro();
+      saveData(); saveProData(); renderDico(); renderPhrases(); renderPro();
       const customCount = dicoData.filter(e=>e.custom).length;
-      showToast(`Sync OK — ${dicoData.length} mots (${customCount} perso)`);
+      showToast('Sync OK - ' + dicoData.length + ' mots (' + customCount + ' perso)');
     }
-
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     localStorage.setItem(LS_SB_LAST, now);
-    setSyncStatus('ok', now);
   } catch(e) {
-    setSyncStatus('error', 'Sync échouée');
+    setSyncStatus('error', 'Sync echouee');
     console.warn('Pull error:', e);
   }
 }
@@ -2979,64 +2933,34 @@ async function mergeDevices() {
 async function diagSync() {
   const box = document.getElementById('sync-diag-result');
   box.style.display = 'block';
-  box.innerHTML = '⏳ Récupération des données cloud...';
+  box.innerHTML = 'Recuperation des donnees cloud...';
   try {
-    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=*`, {
-      headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey }
-    });
-    const rows = await r.json();
-    const row = rows?.[0];
-    if (!row) { box.innerHTML = '❌ Aucune donnée dans le cloud'; return; }
-    const cloudCustomDico   = row.dico   ? JSON.parse(row.dico).length   : 0;
-    const cloudCustomPhrases = row.phrases ? JSON.parse(row.phrases).length : 0;
-    const localCustomDico   = dicoData.filter(e => e.custom).length;
-    const localCustomPhrases = phraseData.filter(e => e.custom).length;
-    const cloudUpdated = new Date(row.updated_at).toLocaleString('fr-FR');
+    const r = await fetch('https://api.github.com/gists/' + sbUrl, { headers: { 'Authorization': 'Bearer ' + sbKey, 'Accept': 'application/vnd.github+json' } });
+    const gist = await r.json();
+    const file = gist.files && gist.files['english_app_data.json'];
+    if (!file) { box.innerHTML = 'Aucune donnee dans le cloud'; return; }
+    const row = JSON.parse(file.content);
     const cloudTotalDico = row.dico ? JSON.parse(row.dico).length : 0;
     const cloudTotalPhrases = row.phrases ? JSON.parse(row.phrases).length : 0;
-    box.innerHTML =
-      `<b>☁️ Cloud total</b> : ${cloudTotalDico} mots, ${cloudTotalPhrases} phrases<br>` +
-      `<b>💾 Local total</b> : ${dicoData.length} mots, ${phraseData.length} phrases<br>` +
-      `<b>🕐 Dernière MAJ cloud</b> : ${cloudUpdated}`;
+    const cloudUpdated = row.updated_at ? new Date(row.updated_at).toLocaleString('fr-FR') : '';
+    box.innerHTML = '<b>Cloud total</b> : ' + cloudTotalDico + ' mots, ' + cloudTotalPhrases + ' phrases<br><b>Local total</b> : ' + dicoData.length + ' mots, ' + phraseData.length + ' phrases<br><b>Derniere MAJ cloud</b> : ' + cloudUpdated;
   } catch(e) {
-    box.innerHTML = '❌ Erreur : ' + e.message;
+    box.innerHTML = 'Erreur : ' + e.message;
   }
 }
 
 async function forcePushSync() {
   const box = document.getElementById('sync-diag-result');
   box.style.display = 'block';
-  box.innerHTML = '⬆️ Push en cours...';
+  box.innerHTML = 'Push en cours...';
   try {
-    // Push ALL words (not just custom) — ensures full sync across devices
-    const payload = {
-      user_id: sbUid,
-      dico: JSON.stringify(dicoData),
-      phrases: JSON.stringify(phraseData),
-      pro: JSON.stringify(proData),
-      dict_history: JSON.stringify(dictHistory),
-      updated_at: new Date().toISOString()
-    };
-    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}`, {
-      method: 'PATCH',
-      headers: { ...sbHeaders(), 'Prefer': 'return=representation' },
-      body: JSON.stringify(payload)
-    });
-    if (!r.ok) { const err = await r.text(); throw new Error(`HTTP ${r.status}: ${err}`); }
-    // Create row if it didn't exist
-    const cnt = r.headers.get('content-range');
-    if (cnt === '*/0' || r.status === 204) {
-      const r2 = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`, {
-        method: 'POST', headers: sbHeaders(), body: JSON.stringify(payload)
-      });
-      if (!r2.ok) throw new Error(`Insert: ${r2.status}`);
-    }
-    const customDico = dicoData.filter(e => e.custom).length;
-    const customPhrases = phraseData.filter(e => e.custom).length;
-    box.innerHTML = `✅ Poussé : ${dicoData.length} mots, ${phraseData.length} phrases`;
+    const payload = { dico: JSON.stringify(dicoData), phrases: JSON.stringify(phraseData), pro: JSON.stringify(proData), dict_history: JSON.stringify(dictHistory), updated_at: new Date().toISOString() };
+    const r = await fetch('https://api.github.com/gists/' + sbUrl, { method: 'PATCH', headers: sbHeaders(), body: JSON.stringify({ files: { 'english_app_data.json': { content: JSON.stringify(payload) } } }) });
+    if (!r.ok) { const err = await r.text(); throw new Error('HTTP ' + r.status + ': ' + err); }
+    box.innerHTML = 'Pousse : ' + dicoData.length + ' mots, ' + phraseData.length + ' phrases';
     setSyncStatus('ok', new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
   } catch(e) {
-    box.innerHTML = '❌ Erreur push : ' + e.message;
+    box.innerHTML = 'Erreur push : ' + e.message;
     console.error(e);
   }
 }
@@ -3044,20 +2968,17 @@ async function forcePushSync() {
 async function forcePullSync() {
   const box = document.getElementById('sync-diag-result');
   box.style.display = 'block';
-  box.innerHTML = '⬇️ Pull en cours...';
+  box.innerHTML = 'Pull en cours...';
   try {
-    const r = await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?user_id=eq.${sbUid}&select=*`, {
-      headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey }
-    });
-    const rows = await r.json();
-    const row = rows?.[0];
-    if (!row) { box.innerHTML = '❌ Aucune donnée dans le cloud'; return; }
-    // Merge cloud → local
+    const r = await fetch('https://api.github.com/gists/' + sbUrl, { headers: { 'Authorization': 'Bearer ' + sbKey, 'Accept': 'application/vnd.github+json' } });
+    const gist = await r.json();
+    const file = gist.files && gist.files['english_app_data.json'];
+    if (!file) { box.innerHTML = 'Aucune donnee dans le cloud'; return; }
+    const row = JSON.parse(file.content);
     if (row.dico) {
       const cloudDico = JSON.parse(row.dico);
-      if (cloudDico.length > 1500) {
-        dicoData = cloudDico; // full replace only if cloud is complete
-      } else if (cloudDico.length > 0) {
+      if (cloudDico.length > 1500) { dicoData = cloudDico; }
+      else if (cloudDico.length > 0) {
         const map = {};
         dicoData.forEach(e => { map[e.word.toLowerCase()] = e; });
         cloudDico.forEach(e => { map[e.word.toLowerCase()] = e; });
@@ -3066,9 +2987,8 @@ async function forcePullSync() {
     }
     if (row.phrases) {
       const cloudPhrases = JSON.parse(row.phrases);
-      if (cloudPhrases.length > 200) {
-        phraseData = cloudPhrases;
-      } else if (cloudPhrases.length > 0) {
+      if (cloudPhrases.length > 200) { phraseData = cloudPhrases; }
+      else if (cloudPhrases.length > 0) {
         const map = {};
         phraseData.forEach(e => { map[e.word.toLowerCase()] = e; });
         cloudPhrases.forEach(e => { map[e.word.toLowerCase()] = e; });
@@ -3076,28 +2996,28 @@ async function forcePullSync() {
       }
     }
     saveData(); renderDico(); renderPhrases();
-    box.innerHTML = `✅ Récupéré : ${dicoData.length} mots, ${phraseData.length} phrases`;
+    box.innerHTML = 'Recupere : ' + dicoData.length + ' mots, ' + phraseData.length + ' phrases';
   } catch(e) {
-    box.innerHTML = '❌ Erreur pull : ' + e.message;
+    box.innerHTML = 'Erreur pull : ' + e.message;
     console.error(e);
   }
 }
 
 async function syncNow() {
   const btn = document.getElementById('btn-sync-now');
-  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-  await syncFromCloud(); // 1. merge cloud → local
-  await syncToCloud();   // 2. push union back to cloud
-  if (btn) { btn.textContent = '🔄 Sync'; btn.disabled = false; }
+  if (btn) { btn.textContent = 'sync'; btn.disabled = true; }
+  await syncFromCloud();
+  await syncToCloud();
+  if (btn) { btn.textContent = 'Sync'; btn.disabled = false; }
   const total = dicoData.length;
-  showToast(`Synchronisation effectuée ! (${total} mots)`);
+  showToast('Synchronisation effectuee ! (' + total + ' mots)');
 }
 
 // Debounced auto-sync: called after every data change
 function scheduleSyncToCloud() {
   if (!sbUrl || !sbKey) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => syncToCloud(), 2000); // 2s debounce
+  syncTimer = setTimeout(() => syncToCloud(), 2000);
 }
 
 function setSyncStatus(state, detail) {
