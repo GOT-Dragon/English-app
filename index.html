@@ -2186,7 +2186,7 @@ CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.`;
       data = parseGroqJSON(await res.text());
     }
     if (!data) {
-      box.innerHTML = '<span style="color:#A32D2D;">⚠️ Erreur — la réponse de l\'IA était invalide. Réessaie.</span>';
+      box.innerHTML = '<span style="color:#A32D2D;">⚠️ Réponse IA vide/invalide — modèle Groq probablement déprécié, vérifier le code.</span>';
       btn.textContent = '🔧 Corriger'; btn.disabled = false;
       return;
     }
@@ -2251,7 +2251,7 @@ CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.` 
       data = parseGroqJSON(await res.text());
     }
     if (!data) {
-      box.innerHTML = '<span style="color:#A32D2D;">⚠️ Erreur — la réponse de l\'IA était invalide. Réessaie.</span>';
+      box.innerHTML = '<span style="color:#A32D2D;">⚠️ Réponse IA vide/invalide — modèle Groq probablement déprécié, vérifier le code.</span>';
       btn.textContent = '🔧'; btn.disabled = false;
       return;
     }
