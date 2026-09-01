@@ -2180,10 +2180,15 @@ CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.`;
         body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 1200, messages: [{ role: 'user', content: prompt }] })
       });
       const d = await res.json();
-      data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}') || { score: 100, corrected: text, tip: '' };
+      data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}');
     } else {
       const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-      data = parseGroqJSON(await res.text()) || { score: 100, corrected: text, tip: '' };
+      data = parseGroqJSON(await res.text());
+    }
+    if (!data) {
+      box.innerHTML = '<span style="color:#A32D2D;">⚠️ Erreur — la réponse de l\'IA était invalide. Réessaie.</span>';
+      btn.textContent = '🔧 Corriger'; btn.disabled = false;
+      return;
     }
     box.innerHTML = buildInlineCorrHTML(data, text, "document.getElementById('edit-en').value=window._inlineCorrection;resetEditCorrection();");
     const isPerfect = (data.score ?? 100) === 100 && (data.corrected||text).trim().toLowerCase() === text.trim().toLowerCase();
@@ -2240,10 +2245,15 @@ CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.` 
         })
       });
       const d = await res.json();
-      data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}') || { score: 100, corrected: text, tip: '' };
+      data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}');
     } else {
       const res = await fetch(CORRECT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-      data = parseGroqJSON(await res.text()) || { score: 100, corrected: text, tip: '' };
+      data = parseGroqJSON(await res.text());
+    }
+    if (!data) {
+      box.innerHTML = '<span style="color:#A32D2D;">⚠️ Erreur — la réponse de l\'IA était invalide. Réessaie.</span>';
+      btn.textContent = '🔧'; btn.disabled = false;
+      return;
     }
     box.innerHTML = buildInlineCorrHTML(data, text, "document.getElementById('new-pen').value=window._inlineCorrection;resetPhraseCorrection();");
     const isPerfect = (data.score ?? 100) === 100 && (data.corrected||text).trim().toLowerCase() === text.trim().toLowerCase();
