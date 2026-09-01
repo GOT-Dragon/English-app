@@ -1611,7 +1611,7 @@ Reply ONLY with this JSON (no markdown):
       const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-        body: JSON.stringify({ model: 'openai/gpt-oss-20b', max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 700, messages: [{ role: 'user', content: prompt }] })
       });
       const gData = await gRes.json();
       const parsed = parseGroqJSON(gData.choices?.[0]?.message?.content || '{}');
@@ -1949,8 +1949,8 @@ async function correctEnglish() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b',
-          max_tokens: 600,
+          model: 'openai/gpt-oss-20b', reasoning_effort: 'low',
+          max_tokens: 1200,
           messages: [{ role: 'user', content: `You are an English grammar corrector. The user wrote this text in English and wants it corrected.
 
 INPUT TEXT: "${text}"
@@ -2089,7 +2089,7 @@ Reply ONLY with this exact JSON, no markdown:
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-        body: JSON.stringify({ model: 'openai/gpt-oss-20b', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 900, messages: [{ role: 'user', content: prompt }] })
       });
       const d = await res.json();
       const parsed = parseGroqJSON(d.choices?.[0]?.message?.content || '{}');
@@ -2177,7 +2177,7 @@ CRITICAL: "corrected" field must be ENGLISH. "reason" and "tip" are in French.`;
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-        body: JSON.stringify({ model: 'openai/gpt-oss-20b', max_tokens: 600, messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 1200, messages: [{ role: 'user', content: prompt }] })
       });
       const d = await res.json();
       data = parseGroqJSON(d.choices?.[0]?.message?.content || '{}') || { score: 100, corrected: text, tip: '' };
@@ -2220,7 +2220,7 @@ async function correctNewPhrase() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b', max_tokens: 400,
+          model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 1000,
           messages: [{ role: 'user', content: `You are a strict English spelling and grammar corrector. The user wrote this text in English.
 
 INPUT TEXT: "${text}"
@@ -2414,7 +2414,7 @@ async function dialTranslate(text) {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-        body: JSON.stringify({ model: 'openai/gpt-oss-20b', max_tokens: 150,
+        body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 600,
           messages: [{ role: 'user', content: `Translate this English sentence to French. Reply with ONLY the French translation, nothing else:
 "${text}"` }]
         })
@@ -2446,7 +2446,7 @@ If there are grammar, vocabulary or style improvements, reply ONLY with this JSO
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-      body: JSON.stringify({ model: 'openai/gpt-oss-20b', max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 700, messages: [{ role: 'user', content: prompt }] })
     });
     const d = await res.json();
     const raw = (d.choices?.[0]?.message?.content || '').trim();
@@ -2520,8 +2520,8 @@ async function sendDialogue() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        max_tokens: 300,
+        model: 'openai/gpt-oss-20b', reasoning_effort: 'low',
+        max_tokens: 900,
         messages: [
           { role: 'system', content: getDialSystem() },
           ...msgs
@@ -2662,8 +2662,8 @@ async function correctPhraseInline(btn, text) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b',
-          max_tokens: 400,
+          model: 'openai/gpt-oss-20b', reasoning_effort: 'low',
+          max_tokens: 1000,
           messages: [{ role: 'user', content: `Correct this English text. Keep corrected text IN ENGLISH. Explain in French.
 
 INPUT: "${text}"
