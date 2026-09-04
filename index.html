@@ -1641,7 +1641,7 @@ Reply ONLY with this JSON (no markdown):
     let examples = [];
     if (srcLang === 'en' && word.split(' ').length === 1) {
       try {
-        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`);
+        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`, { signal: AbortSignal.timeout(3000) });
         if (fdRes.ok) {
           const fdData = await fdRes.json();
           const entry = fdData[0];
@@ -1660,7 +1660,7 @@ Reply ONLY with this JSON (no markdown):
     // 4. If FR source, try to get examples from a reverse lookup
     if (srcLang === 'fr' && mainTrans && mainTrans.split(' ').length === 1) {
       try {
-        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(mainTrans.toLowerCase())}`);
+        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(mainTrans.toLowerCase())}`, { signal: AbortSignal.timeout(3000) });
         if (fdRes.ok) {
           const fdData = await fdRes.json();
           const entry = fdData[0];
