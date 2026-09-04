@@ -1636,44 +1636,9 @@ Reply ONLY with this JSON (no markdown):
       )];
     }
 
-    // 3. Examples via Free Dictionary API (EN only — for phonetic + usage)
+    // 3. Phonetic + examples are fetched separately, AFTER display, so they never block the translation (see enrichTranslation)
     let phonetic = '';
     let examples = [];
-    if (srcLang === 'en' && word.split(' ').length === 1) {
-      try {
-        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`, { signal: AbortSignal.timeout(3000) });
-        if (fdRes.ok) {
-          const fdData = await fdRes.json();
-          const entry = fdData[0];
-          phonetic = entry.phonetics?.find(p => p.text)?.text || '';
-          // Extract examples with their context
-          entry.meanings?.forEach(m => {
-            m.definitions?.forEach(d => {
-              if (d.example) examples.push({ en: d.example, type: m.partOfSpeech });
-            });
-          });
-          examples = examples.slice(0, 4);
-        }
-      } catch(e) { /* skip */ }
-    }
-
-    // 4. If FR source, try to get examples from a reverse lookup
-    if (srcLang === 'fr' && mainTrans && mainTrans.split(' ').length === 1) {
-      try {
-        const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(mainTrans.toLowerCase())}`, { signal: AbortSignal.timeout(3000) });
-        if (fdRes.ok) {
-          const fdData = await fdRes.json();
-          const entry = fdData[0];
-          phonetic = entry.phonetics?.find(p => p.text)?.text || '';
-          entry.meanings?.forEach(m => {
-            m.definitions?.forEach(d => {
-              if (d.example) examples.push({ en: d.example, type: m.partOfSpeech });
-            });
-          });
-          examples = examples.slice(0, 4);
-        }
-      } catch(e) { /* skip */ }
-    }
 
     // Build HTML
     const displayWord = srcLang === 'en' ? word : mainTrans;
@@ -1688,11 +1653,8 @@ Reply ONLY with this JSON (no markdown):
           <div class="trad-result-text">${mainTrans}</div>
         </div>
         <button class="trad-copy-btn" onclick="copyTrad(this,'${copyEsc}')">📋 Copier</button>
-      </div>`;
-
-    if (phonetic) {
-      h += `<div class="trad-phonetic">${srcLang === 'en' ? word : mainTrans} ${phonetic}</div>`;
-    }
+      </div>
+      <div id="trad-phonetic-slot"></div>`;
 
     if (alts.length > 0) {
       h += `<div class="trad-alt-wrap">
@@ -1705,8 +1667,9 @@ Reply ONLY with this JSON (no markdown):
     }
 
     h += `</div>`;
+    h += `<div id="trad-examples-slot"></div>`;
 
-    // Examples section
+    // Examples section (kept for structure, but examples[] is always empty at first render now)
     if (examples.length > 0) {
       h += `<div class="trad-examples">
         <div class="trad-examples-header">
@@ -1741,6 +1704,7 @@ Reply ONLY with this JSON (no markdown):
 
     if (document.getElementById('trad-input').value.trim() !== word) return;
     el.innerHTML = h;
+    enrichTranslation(word, mainTrans, srcLang);
 
   } catch(err) {
     if (document.getElementById('trad-input').value.trim() !== word) return;
@@ -1750,6 +1714,55 @@ Reply ONLY with this JSON (no markdown):
       el.innerHTML = `<div class="trad-error">Traduction introuvable pour "<strong>${word}</strong>".<br>Vérifiez l'orthographe ou réessayez.</div>`;
     }
   }
+}
+
+async function enrichTranslation(word, mainTrans, srcLang) {
+  // Fetches phonetic + examples AFTER the translation is already shown, and injects
+  // them into the existing card if/when they arrive. Never blocks the main translation.
+  const lookupWord = srcLang === 'en' ? word : mainTrans;
+  if (!lookupWord || lookupWord.split(' ').length !== 1) return;
+  try {
+    const fdRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lookupWord.toLowerCase())}`, { signal: AbortSignal.timeout(2500) });
+    if (!fdRes.ok) return;
+    // If the user has since changed the input, don't touch the DOM
+    if (document.getElementById('trad-input').value.trim() !== word) return;
+    const fdData = await fdRes.json();
+    const entry = fdData[0];
+    const phonetic = entry.phonetics?.find(p => p.text)?.text || '';
+    let examples = [];
+    entry.meanings?.forEach(m => {
+      m.definitions?.forEach(d => {
+        if (d.example) examples.push({ en: d.example, type: m.partOfSpeech });
+      });
+    });
+    examples = examples.slice(0, 4);
+
+    if (document.getElementById('trad-input').value.trim() !== word) return;
+
+    const phSlot = document.getElementById('trad-phonetic-slot');
+    if (phSlot && phonetic) {
+      phSlot.innerHTML = `<div class="trad-phonetic">${lookupWord} ${phonetic}</div>`;
+    }
+
+    const exSlot = document.getElementById('trad-examples-slot');
+    if (exSlot && examples.length > 0) {
+      const re = new RegExp(`\\b(${lookupWord.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})\\b`, 'gi');
+      let exHtml = `<div class="trad-examples">
+        <div class="trad-examples-header">
+          <h4>Exemples d'utilisation</h4>
+          <span style="font-size:11px;color:var(--text3);">${examples.length} exemple${examples.length > 1 ? 's' : ''}</span>
+        </div>`;
+      examples.forEach(ex => {
+        const highlighted = ex.en.replace(re, '<span class="trad-ex-highlight">$1</span>');
+        exHtml += `<div class="trad-example">
+          <div class="trad-ex-en">${highlighted}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px;font-style:normal;">${ex.type}</div>
+        </div>`;
+      });
+      exHtml += `</div>`;
+      exSlot.innerHTML = exHtml;
+    }
+  } catch(e) { /* dictionnaire indisponible — la traduction reste affichée sans exemples */ }
 }
 
 function copyTrad(btn, text) {
