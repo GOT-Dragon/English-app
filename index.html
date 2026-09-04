@@ -1739,9 +1739,11 @@ Reply ONLY with this JSON (no markdown):
       </div>`;
     }
 
+    if (document.getElementById('trad-input').value.trim() !== word) return;
     el.innerHTML = h;
 
   } catch(err) {
+    if (document.getElementById('trad-input').value.trim() !== word) return;
     if (!navigator.onLine) {
       el.innerHTML = `<div class="trad-error">Vous êtes hors ligne. La traduction nécessite une connexion internet.</div>`;
     } else {
