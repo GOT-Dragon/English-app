@@ -3223,8 +3223,7 @@ function initSplash() {
 
 function splashSpeak() {
   if (!splashPhrase) return;
-  if (splashStep === 0) speak(splashPhrase.en, 'en');
-  else speak(splashPhrase.fr, 'fr');
+  speak(splashPhrase.en, 'en');
 }
 
 function splashTap() {
