@@ -1692,8 +1692,9 @@ Reply ONLY with this JSON (no markdown):
     // Add to personal dico suggestion
     const inDico = dicoData.find(d => d.word.toLowerCase() === (srcLang === 'en' ? word : mainTrans).toLowerCase());
     if (!inDico && word.split(' ').length <= 3) {
-      const engWord = srcLang === 'en' ? word : mainTrans;
-      const frWord = srcLang === 'en' ? mainTrans : word;
+      const transAll = [mainTrans, ...alts].filter(Boolean).join(', ');
+      const engWord = srcLang === 'en' ? word : transAll;
+      const frWord = srcLang === 'en' ? transAll : word;
       const ew = engWord.replace(/'/g, "\\'");
       const fw = frWord.replace(/'/g, "\\'");
       h += `<div class="trad-add-bar">
