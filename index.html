@@ -441,6 +441,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         </div>
         <div class="alpha-nav" id="dico-alpha"></div>
         <div class="alpha-nav" id="dico-verb-alpha" style="display:none;"></div>
+        <div class="alpha-nav" id="dico-expr-alpha" style="display:none;"></div>
         <div class="stats-row" style="display:flex;align-items:center;justify-content:space-between;">
           <div style="display:flex;gap:6px;">
             <div class="stat-chip"><strong id="dico-count">0</strong> mots</div>
@@ -960,7 +961,7 @@ const PRO_DATA = {
 // STATE
 // ═══════════════════════════════════════════
 let dicoData, phraseData;
-let dicoFilter='', dicoLetter='all', dicoPage=1, verbLetter='all';
+let dicoFilter='', dicoLetter='all', dicoPage=1, verbLetter='all', exprLetter='all';
 let phraseFilter='', phraseLetter='all', phrasePage=1;
 let qMode='dico', qItems=[], qIdx=0, qScore=0, qAnswered=false;
 let dictHistory=[];
@@ -1125,6 +1126,7 @@ function toggleDicoMode() {
 
 function isVerbWord(w) { return /^to\s+/i.test(w); }
 function verbFirstLetter(w) { return w.replace(/^to\s+/i, '')[0].toUpperCase(); }
+function isExpression(w) { return w.trim().includes(' ') && !isVerbWord(w); }
 
 function renderDico() {
   let d = dicoData;
@@ -1132,13 +1134,17 @@ function renderDico() {
   if(dicoLetter==='VERBS'){
     d=d.filter(e=>isVerbWord(e.word));
     if(verbLetter!=='all') d=d.filter(e=>verbFirstLetter(e.word)===verbLetter);
+  } else if(dicoLetter==='EXPR'){
+    d=d.filter(e=>isExpression(e.word));
+    if(exprLetter!=='all') d=d.filter(e=>e.word[0].toUpperCase()===exprLetter);
   } else if(dicoLetter!=='all'){
-    d=d.filter(e=>!isVerbWord(e.word) && e.word[0].toUpperCase()===dicoLetter);
+    d=d.filter(e=>!isVerbWord(e.word) && !isExpression(e.word) && e.word[0].toUpperCase()===dicoLetter);
   }
   const letters=['all',...new Set(dicoData.map(e=>e.word[0].toUpperCase()).sort())];
   document.getElementById('dico-alpha').innerHTML =
     `<button class="alpha-btn${dicoLetter==='all'?' active':''}" onclick="setDL('all')">Tous</button>` +
     `<button class="alpha-btn${dicoLetter==='VERBS'?' active':''}" onclick="setVerbFilter()">🔤 Verbes</button>` +
+    `<button class="alpha-btn${dicoLetter==='EXPR'?' active':''}" onclick="setExprFilter()">💬 Expressions</button>` +
     letters.filter(l=>l!=='all').map(l=>`<button class="alpha-btn${dicoLetter===l?' active':''}" onclick="setDL('${l}')">${l}</button>`).join('');
 
   const verbAlphaEl = document.getElementById('dico-verb-alpha');
@@ -1148,6 +1154,15 @@ function renderDico() {
     verbAlphaEl.style.display='flex';
   } else {
     verbAlphaEl.style.display='none';
+  }
+
+  const exprAlphaEl = document.getElementById('dico-expr-alpha');
+  if(dicoLetter==='EXPR'){
+    const exprLetters=['all',...new Set(dicoData.filter(e=>isExpression(e.word)).map(e=>e.word[0].toUpperCase()).sort())];
+    exprAlphaEl.innerHTML = exprLetters.map(l=>`<button class="alpha-btn${exprLetter===l?' active':''}" onclick="setExprLetter('${l}')">${l==='all'?'Tous':l}</button>`).join('');
+    exprAlphaEl.style.display='flex';
+  } else {
+    exprAlphaEl.style.display='none';
   }
 
   const tp=Math.max(1,Math.ceil(d.length/PER));
@@ -1195,9 +1210,11 @@ function renderDico() {
     document.querySelectorAll('#dico-grid .flip-card').forEach(c => c.classList.add('flipped'));
   }
 }
-function setDL(l){dicoLetter=l;verbLetter='all';dicoPage=1;renderDico();}
+function setDL(l){dicoLetter=l;verbLetter='all';exprLetter='all';dicoPage=1;renderDico();}
 function setVerbFilter(){dicoLetter='VERBS';verbLetter='all';dicoPage=1;renderDico();}
 function setVerbLetter(l){verbLetter=l;dicoPage=1;renderDico();}
+function setExprFilter(){dicoLetter='EXPR';exprLetter='all';dicoPage=1;renderDico();}
+function setExprLetter(l){exprLetter=l;dicoPage=1;renderDico();}
 function filterDico(){dicoFilter=document.getElementById('dico-search').value;dicoPage=1;renderDico();}
 function addDicoEntry(){
   const w=document.getElementById('new-word').value.trim();
