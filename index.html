@@ -1119,11 +1119,8 @@ function toggleDicoMode() {
     btn.style.background = dicoMode === 'fr' ? 'var(--blue)' : 'var(--surface)';
     btn.style.color = dicoMode === 'fr' ? '#fff' : 'var(--blue)';
   }
-  // Flip all cards to match the new mode
-  document.querySelectorAll('#dico-grid .flip-card').forEach(card => {
-    if (dicoMode === 'fr') card.classList.add('flipped');
-    else card.classList.remove('flipped');
-  });
+  // Rebuild the cards so their buttons (edit / add-to-pratique / delete) match the new mode
+  renderDico();
 }
 
 function isVerbWord(w) { return /^to\s+/i.test(w); }
