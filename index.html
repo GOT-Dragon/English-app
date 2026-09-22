@@ -1181,7 +1181,7 @@ function renderDico() {
     const backSpeakLang = dicoMode === 'fr' ? 'en' : 'fr';
     const backSpeak = dicoMode === 'fr' ? we : te;
     const frontHint = dicoMode === 'fr' ? 'appuyer pour voir en anglais' : 'appuyer pour voir';
-    return `<div class="flip-card${dicoMode==='fr'?' flipped':''}" onclick="this.classList.toggle('flipped')">
+    return `<div class="flip-card" onclick="this.classList.toggle('flipped')">
       <div class="flip-inner">
         <div class="flip-front">
           <span class="flip-word">${frontWord}</span>
@@ -1204,10 +1204,6 @@ function renderDico() {
     </div>`;
   }).join('');
   renderPages('dico-pages',dicoPage,tp,p=>{dicoPage=p;renderDico();});
-  // Apply current mode after render
-  if (dicoMode === 'fr') {
-    document.querySelectorAll('#dico-grid .flip-card').forEach(c => c.classList.add('flipped'));
-  }
 }
 function setDL(l){dicoLetter=l;verbLetter='all';exprLetter='all';dicoPage=1;renderDico();}
 function setVerbFilter(){dicoLetter='VERBS';verbLetter='all';dicoPage=1;renderDico();}
