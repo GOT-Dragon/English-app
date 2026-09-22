@@ -1195,7 +1195,7 @@ function renderDico() {
           <span class="flip-trans">${backWord}</span>
           <div style="position:absolute;bottom:6px;right:6px;display:flex;gap:3px;" onclick="event.stopPropagation()">
             <button class="sound-btn" onclick="speak('${backSpeak}','${backSpeakLang}')" title="Écouter">🔊</button>
-            ${dicoMode==='en' ? `<button class="sound-btn" title="Ajouter à Pratique" onclick="addDicoToPratique('${we}','${te}')">📝</button>` : ''}
+            <button class="sound-btn" title="Ajouter à Pratique" onclick="addDicoToPratique('${we}','${te}')">📝</button>
             <button class="sound-btn" title="Supprimer ce mot" onclick="confirmDeleteDico(${globalIdx},'${we}')">🗑️</button>
             ${dicoMode==='fr' ? `<button class="sound-btn" onclick="openEditDico(${globalIdx},'${we}','${te}')" title="Modifier">✏️</button>` : ''}
           </div>
