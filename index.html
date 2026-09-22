@@ -475,6 +475,8 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
           </div>
         </div>
         <div class="alpha-nav" id="phrase-alpha"></div>
+        <div class="alpha-nav" id="phrase-verb-alpha" style="display:none;"></div>
+        <div class="alpha-nav" id="phrase-expr-alpha" style="display:none;"></div>
         <div class="stats-row">
           <div class="stat-chip"><strong id="phrase-count">0</strong> phrases</div>
           <div class="stat-chip" style="font-size:11px;color:var(--text3);">Appuyez pour révéler</div>
@@ -962,7 +964,7 @@ const PRO_DATA = {
 // ═══════════════════════════════════════════
 let dicoData, phraseData;
 let dicoFilter='', dicoLetter='all', dicoPage=1, verbLetter='all', exprLetter='all';
-let phraseFilter='', phraseLetter='all', phrasePage=1;
+let phraseFilter='', phraseLetter='all', phrasePage=1, phraseVerbLetter='all', phraseExprLetter='all';
 let qMode='dico', qItems=[], qIdx=0, qScore=0, qAnswered=false;
 let dictHistory=[];
 let deferredInstall=null;
@@ -1263,9 +1265,40 @@ function cyclePhrase(card) {
 function renderPhrases() {
   let d=phraseData;
   if(phraseFilter) d=d.filter(e=>e.word.toLowerCase().includes(phraseFilter.toLowerCase())||e.en.toLowerCase().includes(phraseFilter.toLowerCase()));
-  if(phraseLetter!=='all') d=d.filter(e=>e.word[0].toUpperCase()===phraseLetter);
+  if(phraseLetter==='VERBS'){
+    d=d.filter(e=>isVerbWord(e.word));
+    if(phraseVerbLetter!=='all') d=d.filter(e=>verbFirstLetter(e.word)===phraseVerbLetter);
+  } else if(phraseLetter==='EXPR'){
+    d=d.filter(e=>isExpression(e.word));
+    if(phraseExprLetter!=='all') d=d.filter(e=>e.word[0].toUpperCase()===phraseExprLetter);
+  } else if(phraseLetter!=='all'){
+    d=d.filter(e=>!isVerbWord(e.word) && !isExpression(e.word) && e.word[0].toUpperCase()===phraseLetter);
+  }
   const letters=['all',...new Set(phraseData.map(e=>e.word[0].toUpperCase()).sort())];
-  document.getElementById('phrase-alpha').innerHTML=letters.map(l=>`<button class="alpha-btn${phraseLetter===l?' active':''}" onclick="setPL('${l}')">${l==='all'?'Tous':l}</button>`).join('');
+  document.getElementById('phrase-alpha').innerHTML=
+    `<button class="alpha-btn${phraseLetter==='all'?' active':''}" onclick="setPL('all')">Tous</button>` +
+    `<button class="alpha-btn${phraseLetter==='VERBS'?' active':''}" onclick="setPhraseVerbFilter()">🔤 Verbes</button>` +
+    `<button class="alpha-btn${phraseLetter==='EXPR'?' active':''}" onclick="setPhraseExprFilter()">💬 Expressions</button>` +
+    letters.filter(l=>l!=='all').map(l=>`<button class="alpha-btn${phraseLetter===l?' active':''}" onclick="setPL('${l}')">${l}</button>`).join('');
+
+  const verbAlphaEl = document.getElementById('phrase-verb-alpha');
+  if(phraseLetter==='VERBS'){
+    const vLetters=['all',...new Set(phraseData.filter(e=>isVerbWord(e.word)).map(e=>verbFirstLetter(e.word)).sort())];
+    verbAlphaEl.innerHTML = vLetters.map(l=>`<button class="alpha-btn${phraseVerbLetter===l?' active':''}" onclick="setPhraseVerbLetter('${l}')">${l==='all'?'Tous':l}</button>`).join('');
+    verbAlphaEl.style.display='flex';
+  } else {
+    verbAlphaEl.style.display='none';
+  }
+
+  const exprAlphaEl = document.getElementById('phrase-expr-alpha');
+  if(phraseLetter==='EXPR'){
+    const eLetters=['all',...new Set(phraseData.filter(e=>isExpression(e.word)).map(e=>e.word[0].toUpperCase()).sort())];
+    exprAlphaEl.innerHTML = eLetters.map(l=>`<button class="alpha-btn${phraseExprLetter===l?' active':''}" onclick="setPhraseExprLetter('${l}')">${l==='all'?'Tous':l}</button>`).join('');
+    exprAlphaEl.style.display='flex';
+  } else {
+    exprAlphaEl.style.display='none';
+  }
+
   const tp=Math.max(1,Math.ceil(d.length/PER));
   phrasePage=Math.min(phrasePage,tp);
   const items=d.slice((phrasePage-1)*PER,phrasePage*PER);
@@ -1292,7 +1325,11 @@ function renderPhrases() {
   }).join('');
   renderPages('phrase-pages',phrasePage,tp,p=>{phrasePage=p;renderPhrases();});
 }
-function setPL(l){phraseLetter=l;phrasePage=1;renderPhrases();}
+function setPL(l){phraseLetter=l;phraseVerbLetter='all';phraseExprLetter='all';phrasePage=1;renderPhrases();}
+function setPhraseVerbFilter(){phraseLetter='VERBS';phraseVerbLetter='all';phrasePage=1;renderPhrases();}
+function setPhraseVerbLetter(l){phraseVerbLetter=l;phrasePage=1;renderPhrases();}
+function setPhraseExprFilter(){phraseLetter='EXPR';phraseExprLetter='all';phrasePage=1;renderPhrases();}
+function setPhraseExprLetter(l){phraseExprLetter=l;phrasePage=1;renderPhrases();}
 function filterPhrases(){phraseFilter=document.getElementById('phrase-search').value;phrasePage=1;renderPhrases();}
 function addPhraseEntry(){
   const w=document.getElementById('new-pw').value.trim();
