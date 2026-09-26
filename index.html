@@ -137,11 +137,13 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .phrase-card.step1 .phrase-en { display: block; }
 .phrase-card.step1 .phrase-actions { display: flex; }
 .phrase-card.step1 .reveal-hint { display: none; }
+.phrase-card.step1 .reveal-sound-btn { display: none; }
 /* Step 2 : + traduction + fond vert */
 .phrase-card.step2 .phrase-en { display: block; }
 .phrase-card.step2 .phrase-fr { display: block; }
 .phrase-card.step2 .phrase-actions { display: flex; }
 .phrase-card.step2 .reveal-hint { display: none; }
+.phrase-card.step2 .reveal-sound-btn { display: none; }
 .phrase-card.step2 { background: var(--green-light); border-color: rgba(59,109,17,0.3); }
 
 /* PRO CARDS */
@@ -1305,6 +1307,7 @@ function renderPhrases() {
     return `<div class="phrase-card" onclick="cyclePhrase(this)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
         <div class="phrase-word">${e.word}</div>
+        <button class="sound-btn reveal-sound-btn" onclick="event.stopPropagation();speak('${we}','en')" title="Écouter" style="flex-shrink:0;">🔊</button>
         <div class="phrase-actions" style="gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
           <button class="sound-btn" onclick="speak('${ee}','en')" title="Écouter">🔊</button>
           ${e.custom ? `<button class="sound-btn" title="Corriger avec l'IA" onclick="correctPhraseInline(this,'${ee}')">🔧</button>` : ''}
