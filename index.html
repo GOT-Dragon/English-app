@@ -674,6 +674,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
             oninput="onTradInput()"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();translate();}"></textarea>
           <button class="trad-clear" id="trad-clear-btn" onclick="clearTrad()">✕</button>
+          <button class="trad-clear" id="trad-input-speak-btn" onclick="speakTradInput()" title="Écouter" style="display:none;bottom:10px;top:auto;background:var(--blue);">🔊</button>
         </div>
         <button class="btn-primary" onclick="translate()" style="width:100%;margin-bottom:14px;">Traduire</button>
         <div id="trad-result"></div>
@@ -1626,6 +1627,7 @@ function swapLang() {
   if (newInput) {
     document.getElementById('trad-input').value = newInput;
     document.getElementById('trad-clear-btn').classList.add('visible');
+    updateTradSpeakBtn();
     translate();
   }
 }
@@ -1633,14 +1635,28 @@ function swapLang() {
 function onTradInput() {
   const val = document.getElementById('trad-input').value;
   document.getElementById('trad-clear-btn').classList.toggle('visible', val.length > 0);
+  updateTradSpeakBtn();
   clearTimeout(tradTimer);
   if (val.trim().length >= 2) tradTimer = setTimeout(translate, 600);
   else document.getElementById('trad-result').innerHTML = '';
 }
 
+function updateTradSpeakBtn() {
+  const val = document.getElementById('trad-input').value;
+  const btn = document.getElementById('trad-input-speak-btn');
+  if (btn) btn.style.display = val.trim().length > 0 ? 'flex' : 'none';
+}
+
+function speakTradInput() {
+  const val = document.getElementById('trad-input').value.trim();
+  if (!val) return;
+  speak(val, tradLang);
+}
+
 function clearTrad() {
   document.getElementById('trad-input').value = '';
   document.getElementById('trad-clear-btn').classList.remove('visible');
+  updateTradSpeakBtn();
   document.getElementById('trad-result').innerHTML = '';
 }
 
@@ -1968,7 +1984,7 @@ function renderTradHist() {
   el.innerHTML = tradHistory.map(h => {
     const flag = h.lang === 'en' ? '🇬🇧' : '🇫🇷';
     const we = h.word.replace(/'/g, "\\'");
-    return `<button class="trad-hist-chip" onclick="setLang('${h.lang}');document.getElementById('trad-input').value='${we}';document.getElementById('trad-clear-btn').classList.add('visible');translate();">${flag} ${h.word}</button>`;
+    return `<button class="trad-hist-chip" onclick="setLang('${h.lang}');document.getElementById('trad-input').value='${we}';document.getElementById('trad-clear-btn').classList.add('visible');updateTradSpeakBtn();translate();">${flag} ${h.word}</button>`;
   }).join('');
 }
 
