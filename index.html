@@ -131,6 +131,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .phrase-word { font-size: 12px; font-weight: 600; color: var(--blue); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
 .phrase-en { font-size: 14px; color: var(--text); line-height: 1.4; display: none; }
 .phrase-fr { font-size: 13px; color: var(--green); margin-top: 6px; font-style: italic; display: none; }
+.phrase-fr-sentence { font-size: 13px; color: var(--blue-mid); margin-top: 6px; display: none; }
 .phrase-actions { display: none; }
 .reveal-hint { font-size: 10px; color: var(--text3); margin-top: 4px; }
 /* Step 1 : phrase EN + boutons */
@@ -141,6 +142,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 /* Step 2 : + traduction + fond vert */
 .phrase-card.step2 .phrase-en { display: block; }
 .phrase-card.step2 .phrase-fr { display: block; }
+.phrase-card.step2 .phrase-fr-sentence { display: block; }
 .phrase-card.step2 .phrase-actions { display: flex; }
 .phrase-card.step2 .reveal-hint { display: none; }
 .phrase-card.step2 .reveal-sound-btn { display: none; }
@@ -1253,8 +1255,29 @@ function cyclePhrase(card) {
   } else if (card.classList.contains('step1')) {
     card.classList.remove('step1');
     card.classList.add('step2');
+    loadPhraseSentenceTranslation(card);
   } else {
     card.classList.add('step1');
+  }
+}
+
+async function loadPhraseSentenceTranslation(card) {
+  const idx = parseInt(card.dataset.idx, 10);
+  const e = phraseData[idx];
+  if (!e) return;
+  if (e.frSentence) return; // deja en cache
+  const slot = document.getElementById('pfr-sent-' + idx);
+  if (slot) slot.textContent = 'Traduction de la phrase…';
+  try {
+    const translated = await dialTranslate(e.en);
+    e.frSentence = translated.replace(/^🇫🇷\s*/, '');
+    saveData();
+    scheduleSyncToCloud();
+    const stillThere = document.getElementById('pfr-sent-' + idx);
+    if (stillThere) stillThere.textContent = e.frSentence;
+  } catch(err) {
+    const stillThere = document.getElementById('pfr-sent-' + idx);
+    if (stillThere) stillThere.textContent = '';
   }
 }
 
@@ -1304,7 +1327,7 @@ function renderPhrases() {
     const we = e.word.replace(/'/g,"\\'");
     const ee = e.en.replace(/'/g,"\\'");
     const fe = (e.fr||'').replace(/'/g,"\\'");
-    return `<div class="phrase-card" onclick="cyclePhrase(this)">
+    return `<div class="phrase-card" data-idx="${globalIdx}" onclick="cyclePhrase(this)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
         <div class="phrase-word">${e.word}</div>
         <button class="sound-btn reveal-sound-btn" onclick="event.stopPropagation();speak('${we}','en')" title="Écouter" style="flex-shrink:0;">🔊</button>
@@ -1316,6 +1339,7 @@ function renderPhrases() {
       </div>
       <div class="reveal-hint">appuyez pour révéler</div>
       <div class="phrase-en">${e.en}</div>
+      <div class="phrase-fr-sentence" id="pfr-sent-${globalIdx}">${e.frSentence ? e.frSentence : ''}</div>
       <div class="phrase-fr">${e.fr||'<em style="color:var(--text3)">Pas de traduction</em>'}</div>
       <div class="phrase-correct-result" style="display:none;margin-top:8px;"></div>
     </div>`;
