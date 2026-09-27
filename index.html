@@ -1979,7 +1979,8 @@ function saveEditItem() {
     phraseData[editIdx].word = w;
     phraseData[editIdx].en = en;
     phraseData[editIdx].fr = fr;
-    saveData(); scheduleSyncToCloud(); renderPhrases();
+    delete phraseData[editIdx].frSentence; // la traduction de phrase en cache est obsolete, on la regenerera
+    saveData(); syncToCloud(); renderPhrases();
     showToast('Phrase modifiée !');
   }
   closeEditModal();
