@@ -98,6 +98,10 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .search-wrap { display: flex; gap: 8px; margin-bottom: 12px; }
 .search-input { flex: 1; padding: 10px 14px; border-radius: var(--radius); border: 0.5px solid var(--border); background: var(--surface); font-size: 15px; color: var(--text); outline: none; }
 .search-input:focus { border-color: var(--blue); }
+.search-field { position: relative; flex: 1; display: flex; }
+.search-field .search-input { width: 100%; padding-right: 40px; }
+.search-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--text3); color: white; font-size: 13px; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; }
+.search-clear.visible { display: flex; }
 .btn-primary { padding: 10px 16px; border-radius: var(--radius); border: none; background: var(--blue); color: white; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .btn-primary:active { opacity: 0.85; }
 .btn-outline { padding: 8px 14px; border-radius: var(--radius); border: 0.5px solid var(--border-strong); background: transparent; color: var(--text); font-size: 13px; cursor: pointer; }
@@ -432,7 +436,10 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <!-- DICO -->
       <div class="sub-section active" id="v-dico">
         <div class="search-wrap">
-          <input class="search-input" id="dico-search" placeholder="Chercher un mot ou traduction..." oninput="filterDico()" autocomplete="new-password">
+          <div class="search-field">
+            <input class="search-input" id="dico-search" placeholder="Chercher un mot ou traduction..." oninput="filterDico()" autocomplete="new-password">
+            <button class="search-clear" id="dico-search-clear" onclick="clearSearch('dico-search','dico')" title="Effacer la recherche">✕</button>
+          </div>
           <button class="btn-primary" onclick="toggleAddForm('dico-form')">+</button>
         </div>
         <div class="add-form" id="dico-form">
@@ -462,7 +469,10 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <!-- PRATIQUE -->
       <div class="sub-section" id="v-pratique">
         <div class="search-wrap">
-          <input class="search-input" id="phrase-search" placeholder="Chercher un mot ou phrase..." oninput="filterPhrases()">
+          <div class="search-field">
+            <input class="search-input" id="phrase-search" placeholder="Chercher un mot ou phrase..." oninput="filterPhrases()">
+            <button class="search-clear" id="phrase-search-clear" onclick="clearSearch('phrase-search','phrase')" title="Effacer la recherche">✕</button>
+          </div>
           <button class="btn-primary" onclick="toggleAddForm('phrase-form')">+</button>
         </div>
         <div class="add-form" id="phrase-form">
@@ -1215,7 +1225,13 @@ function setVerbFilter(){dicoLetter='VERBS';verbLetter='all';dicoPage=1;renderDi
 function setVerbLetter(l){verbLetter=l;dicoPage=1;renderDico();}
 function setExprFilter(){dicoLetter='EXPR';exprLetter='all';dicoPage=1;renderDico();}
 function setExprLetter(l){exprLetter=l;dicoPage=1;renderDico();}
-function filterDico(){dicoFilter=document.getElementById('dico-search').value;dicoPage=1;renderDico();}
+function filterDico(){dicoFilter=document.getElementById('dico-search').value;document.getElementById('dico-search-clear').classList.toggle('visible',dicoFilter.length>0);dicoPage=1;renderDico();}
+function clearSearch(inputId, kind){
+  const el=document.getElementById(inputId);
+  el.value='';
+  if(kind==='dico') filterDico(); else filterPhrases();
+  el.focus();
+}
 function addDicoEntry(){
   const w=document.getElementById('new-word').value.trim();
   const t=document.getElementById('new-trans').value.trim();
@@ -1351,7 +1367,7 @@ function setPhraseVerbFilter(){phraseLetter='VERBS';phraseVerbLetter='all';phras
 function setPhraseVerbLetter(l){phraseVerbLetter=l;phrasePage=1;renderPhrases();}
 function setPhraseExprFilter(){phraseLetter='EXPR';phraseExprLetter='all';phrasePage=1;renderPhrases();}
 function setPhraseExprLetter(l){phraseExprLetter=l;phrasePage=1;renderPhrases();}
-function filterPhrases(){phraseFilter=document.getElementById('phrase-search').value;phrasePage=1;renderPhrases();}
+function filterPhrases(){phraseFilter=document.getElementById('phrase-search').value;document.getElementById('phrase-search-clear').classList.toggle('visible',phraseFilter.length>0);phrasePage=1;renderPhrases();}
 function addPhraseEntry(){
   const w=document.getElementById('new-pw').value.trim();
   const en=document.getElementById('new-pen').value.trim();
