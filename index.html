@@ -494,6 +494,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         <div class="stats-row">
           <div class="stat-chip"><strong id="phrase-count">0</strong> phrases</div>
           <div class="stat-chip" style="font-size:11px;color:var(--text3);">Appuyez pour révéler</div>
+          <button class="btn-outline" onclick="collapseAllPhrases()" title="Revenir aux mots sans définition" style="padding:4px 12px;font-size:12px;border-radius:6px;">↺ Tout masquer</button>
         </div>
         <div class="phrase-list" id="phrase-grid"></div>
         <div class="pagination" id="phrase-pages"></div>
@@ -1277,16 +1278,28 @@ function cyclePhrase(card) {
   }
 }
 
+function collapseAllPhrases() {
+  document.querySelectorAll('#phrase-grid .phrase-card').forEach(card => card.classList.remove('step1', 'step2'));
+  document.getElementById('main-scroll').scrollTop = 0;
+}
+
+function isValidFrSentence(s) {
+  return !!s && !/NO QUERY SPECIFIED|INVALID|MYMEMORY|Traduction indisponible/i.test(s);
+}
+
 async function loadPhraseSentenceTranslation(card) {
   const idx = parseInt(card.dataset.idx, 10);
   const e = phraseData[idx];
   if (!e) return;
-  if (e.frSentence) return; // deja en cache
   const slot = document.getElementById('pfr-sent-' + idx);
+  if (!e.en || !e.en.trim()) { if (slot) slot.textContent = ''; return; } // pas de phrase a traduire
+  if (isValidFrSentence(e.frSentence)) return; // deja en cache
+  delete e.frSentence;
   if (slot) slot.textContent = 'Traduction de la phrase…';
   try {
-    const translated = await dialTranslate(e.en);
-    e.frSentence = translated.replace(/^🇫🇷\s*/, '');
+    const translated = (await dialTranslate(e.en)).replace(/^🇫🇷\s*/, '');
+    if (!isValidFrSentence(translated)) { if (slot) slot.textContent = ''; return; }
+    e.frSentence = translated;
     saveData();
     scheduleSyncToCloud();
     const stillThere = document.getElementById('pfr-sent-' + idx);
@@ -1355,7 +1368,7 @@ function renderPhrases() {
       </div>
       <div class="reveal-hint">appuyez pour révéler</div>
       <div class="phrase-en">${e.en}</div>
-      <div class="phrase-fr-sentence" id="pfr-sent-${globalIdx}">${e.frSentence ? e.frSentence : ''}</div>
+      <div class="phrase-fr-sentence" id="pfr-sent-${globalIdx}">${isValidFrSentence(e.frSentence) ? e.frSentence : ''}</div>
       <div class="phrase-fr">${e.fr||'<em style="color:var(--text3)">Pas de traduction</em>'}</div>
       <div class="phrase-correct-result" style="display:none;margin-top:8px;"></div>
     </div>`;
