@@ -2142,9 +2142,27 @@ IMPORTANT: "corrected" field must be in ENGLISH, only "reason" and "tip" are in 
       data = parseGroqJSON(raw) || { score: 0, corrected: text, errors: [], tip: 'Impossible de parser la réponse.' };
     }
     el.innerHTML = buildCorrectionHTML(text, data);
+    loadCorrectionTranslation();
   } catch(err) {
     el.innerHTML = `<div class="trad-error">${err.message || 'Service indisponible. Réessayez.'}</div>`;
     console.error('Correction error:', err);
+  }
+}
+
+async function loadCorrectionTranslation() {
+  const fixedEl = document.querySelector('#correct-result .correct-fixed');
+  const slot = document.getElementById('correct-translation');
+  if (!fixedEl || !slot) return;
+  const corrected = fixedEl.textContent.trim();
+  try {
+    const tr = (await dialTranslate(corrected)).replace(/^🇫🇷\s*/, '');
+    const stillSlot = document.getElementById('correct-translation');
+    const stillFixed = document.querySelector('#correct-result .correct-fixed');
+    if (!stillSlot || !stillFixed || stillFixed.textContent.trim() !== corrected) return; // resultat remplace entre-temps
+    stillSlot.textContent = isValidFrSentence(tr) ? tr : 'Traduction indisponible — réessaie.';
+  } catch(e) {
+    const s = document.getElementById('correct-translation');
+    if (s) s.textContent = 'Traduction indisponible — réessaie.';
   }
 }
 
@@ -2195,6 +2213,8 @@ function buildCorrectionHTML(original, data) {
           <button class="copy-btn" onclick="copyTrad(this,'${correctedEsc}')">Copier</button>
         </div>
       </div>
+      <div class="correct-section-label" style="color:var(--blue);margin-top:12px;">Traduction française</div>
+      <div id="correct-translation" style="font-size:14px;color:var(--blue-mid);line-height:1.5;">Traduction en cours…</div>
     </div>`;
 
   if (errors.length > 0) {
