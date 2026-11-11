@@ -1789,7 +1789,10 @@ Reply ONLY with this JSON (no markdown):
           <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${tgtLang === 'fr' ? '🇫🇷 Traduction française' : '🇬🇧 English translation'}</div>
           <div class="trad-result-text">${mainTrans}</div>
         </div>
-        <button class="trad-copy-btn" onclick="copyTrad(this,'${copyEsc}')">📋 Copier</button>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          ${tgtLang === 'en' ? `<button class="sound-btn" onclick="speakTradResult()" title="Écouter la prononciation" style="font-size:18px;">🔊</button>` : ''}
+          <button class="trad-copy-btn" onclick="copyTrad(this,'${copyEsc}')">📋 Copier</button>
+        </div>
       </div>
       <div id="trad-phonetic-slot"></div>`;
 
@@ -1901,6 +1904,11 @@ async function enrichTranslation(word, mainTrans, srcLang) {
       exSlot.innerHTML = exHtml;
     }
   } catch(e) { /* dictionnaire indisponible — la traduction reste affichée sans exemples */ }
+}
+
+function speakTradResult() {
+  const el = document.querySelector('#trad-result .trad-result-text');
+  if (el) speak(el.textContent.trim(), 'en');
 }
 
 function copyTrad(btn, text) {
