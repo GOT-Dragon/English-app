@@ -693,8 +693,9 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
         </div>
         <div style="display:flex;gap:8px;margin-bottom:14px;">
           <button class="btn-primary" onclick="translate()" style="flex:1;">Traduire</button>
-          <button class="btn-primary" onclick="document.getElementById('trad-photo-input').click()" title="Traduire un texte photographié" style="flex-shrink:0;padding:10px 16px;font-size:18px;">📷</button>
+          <button class="btn-primary" onclick="openLiveCamera()" title="Traduction en direct avec la caméra" style="flex-shrink:0;padding:10px 16px;font-size:18px;">📷</button>
           <input type="file" id="trad-photo-input" accept="image/*" style="display:none" onchange="onTradPhoto(event)">
+          <input type="file" id="trad-photo-capture" accept="image/*" capture="environment" style="display:none" onchange="onTradPhoto(event)">
         </div>
         <div id="trad-result"></div>
         <div style="margin-top:4px;">
@@ -913,6 +914,26 @@ create policy "public access" on english_app for all using (true);</code>
 </div>
 
 <!-- TOAST -->
+<!-- LIVE CAMERA OVERLAY -->
+<div id="live-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:#000;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;background:#111;color:#fff;">
+    <div><div style="font-weight:700;font-size:15px;">Traduction en direct</div><div id="live-lang" style="font-size:12px;opacity:.7;"></div></div>
+    <button onclick="closeLiveCamera()" style="width:36px;height:36px;border-radius:50%;border:none;background:#333;color:#fff;font-size:18px;cursor:pointer;">✕</button>
+  </div>
+  <video id="live-video" playsinline muted autoplay style="width:100%;height:42vh;object-fit:cover;background:#000;"></video>
+  <div style="flex:1;overflow-y:auto;background:var(--bg);padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 12px);">
+    <div id="live-status" style="font-size:12px;color:var(--text3);margin-bottom:8px;">…</div>
+    <div id="live-src" style="font-size:13px;color:var(--text2);margin-bottom:8px;line-height:1.4;"></div>
+    <div id="live-tr" style="font-size:20px;font-weight:600;color:var(--blue);line-height:1.4;margin-bottom:14px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-outline" id="live-freeze-btn" onclick="toggleLiveFreeze()">⏸ Figer</button>
+      <button class="btn-outline" id="live-speak-btn" onclick="speakLiveTr()" style="display:none;">🔊 Écouter</button>
+      <button class="btn-primary" onclick="useLiveInTrad()">Utiliser dans Traduire</button>
+      <button class="btn-outline" onclick="document.getElementById('trad-photo-input').click();closeLiveCamera();">🖼️ Galerie</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1777,6 +1798,158 @@ async function onTradPhoto(ev) {
   } catch (e) {
     el.innerHTML = '<div class="trad-error">Lecture de la photo impossible' + (navigator.onLine ? '.' : ' : connexion internet requise la première fois.') + ' Réessaie.</div>';
   }
+}
+
+// ── TRADUCTION EN DIRECT (caméra + OCR) ──
+let liveStream = null, liveWorker = null, liveRunning = false, liveFrozen = false, liveLastText = '', liveSeq = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function setLiveStatus(t) { const s = document.getElementById('live-status'); if (s) s.textContent = t; }
+
+function cleanOcr(t) { return (t || '').replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim(); }
+
+function bigrams(s) {
+  s = s.toLowerCase().replace(/[^a-zà-ÿ0-9]/g, '');
+  const m = new Map();
+  for (let i = 0; i < s.length - 1; i++) { const b = s.slice(i, i + 2); m.set(b, (m.get(b) || 0) + 1); }
+  return m;
+}
+function textSimilarity(a, b) {
+  const A = bigrams(a), B = bigrams(b);
+  let inter = 0, total = 0;
+  A.forEach((n, k) => { inter += Math.min(n, B.get(k) || 0); total += n; });
+  B.forEach(n => total += n);
+  return total ? (2 * inter) / total : 0;
+}
+
+async function quickTranslate(text, src) {
+  const from = src === 'en' ? 'English' : 'French';
+  const to = src === 'en' ? 'French' : 'English';
+  try {
+    const key = localStorage.getItem('eng_groq_key') || '';
+    if (key) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 700,
+          messages: [{ role: 'user', content: `Translate this ${from} text to ${to}. Reply with ONLY the ${to} translation, nothing else:\n"${text}"` }] })
+      });
+      const d = await res.json();
+      const tr = (d.choices?.[0]?.message?.content || '').trim().replace(/^"|"$/g, '');
+      if (isValidFrSentence(tr)) return tr;
+    }
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 450))}&langpair=${src}|${src === 'en' ? 'fr' : 'en'}`, { signal: AbortSignal.timeout(6000) });
+    const d = await r.json();
+    const tr = d.responseData?.translatedText || '';
+    return isValidFrSentence(tr) ? tr : '';
+  } catch (e) { return ''; }
+}
+
+async function openLiveCamera() {
+  document.getElementById('live-overlay').style.display = 'flex';
+  document.getElementById('live-src').textContent = '';
+  document.getElementById('live-tr').textContent = '';
+  document.getElementById('live-speak-btn').style.display = 'none';
+  document.getElementById('live-freeze-btn').textContent = '⏸ Figer';
+  document.getElementById('live-lang').textContent = tradLang === 'en' ? '🇬🇧 Anglais → 🇫🇷 Français' : '🇫🇷 Français → 🇬🇧 Anglais';
+  setLiveStatus('Ouverture de la caméra…');
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    const v = document.getElementById('live-video');
+    v.srcObject = liveStream;
+    await v.play();
+  } catch (e) {
+    closeLiveCamera();
+    showToast('Caméra non autorisée — ouverture de l’appareil photo');
+    document.getElementById('trad-photo-capture').click();
+    return;
+  }
+  liveRunning = true; liveFrozen = false; liveLastText = '';
+  const mySeq = ++liveSeq;
+  try {
+    setLiveStatus('Chargement du lecteur de texte…');
+    await loadTesseract();
+    const worker = await Tesseract.createWorker(tradLang === 'fr' ? 'fra' : 'eng', 1, {
+      logger: m => { if (m.status === 'loading language traineddata') setLiveStatus('Téléchargement de la langue (1ère utilisation uniquement)…'); }
+    });
+    if (!liveRunning || mySeq !== liveSeq) { worker.terminate(); return; }
+    liveWorker = worker;
+  } catch (e) {
+    setLiveStatus('Lecteur de texte indisponible (connexion internet requise la première fois).');
+    return;
+  }
+  liveLoop(mySeq);
+}
+
+async function liveLoop(mySeq) {
+  while (liveRunning && mySeq === liveSeq) {
+    if (!liveFrozen) {
+      try {
+        const v = document.getElementById('live-video');
+        if (v && v.videoWidth) {
+          const scale = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
+          const cv = document.createElement('canvas');
+          cv.width = Math.round(v.videoWidth * scale);
+          cv.height = Math.round(v.videoHeight * scale);
+          cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
+          setLiveStatus('Lecture…');
+          const res = await liveWorker.recognize(cv);
+          if (liveRunning && mySeq === liveSeq && !liveFrozen) {
+            const text = cleanOcr(res.data.text);
+            const readable = res.data.confidence >= 55 && /[A-Za-zÀ-ÿ]{2,}/.test(text) && text.length >= 3;
+            if (!readable) {
+              setLiveStatus('Cadre un texte net et bien éclairé…');
+            } else if (!liveLastText || textSimilarity(text, liveLastText) < 0.88) {
+              liveLastText = text;
+              document.getElementById('live-src').textContent = text;
+              setLiveStatus('Traduction…');
+              const tr = await quickTranslate(text, tradLang);
+              if (liveRunning && mySeq === liveSeq && !liveFrozen && liveLastText === text) {
+                document.getElementById('live-tr').textContent = tr || 'Traduction indisponible';
+                document.getElementById('live-speak-btn').style.display = (tr && tradLang === 'fr') ? 'inline-block' : 'none';
+                setLiveStatus('En direct');
+              }
+            } else {
+              setLiveStatus('En direct');
+            }
+          }
+        }
+      } catch (e) { /* on retente au prochain cycle */ }
+    }
+    await sleep(700);
+  }
+}
+
+function toggleLiveFreeze() {
+  liveFrozen = !liveFrozen;
+  const v = document.getElementById('live-video');
+  if (liveFrozen) { v.pause(); setLiveStatus('Image figée'); } else { v.play(); setLiveStatus('En direct'); }
+  document.getElementById('live-freeze-btn').textContent = liveFrozen ? '▶ Reprendre' : '⏸ Figer';
+}
+
+function speakLiveTr() {
+  const t = document.getElementById('live-tr').textContent.trim();
+  if (t) speak(t, 'en');
+}
+
+function useLiveInTrad() {
+  const text = liveLastText;
+  closeLiveCamera();
+  if (!text) { showToast('Aucun texte détecté'); return; }
+  const input = document.getElementById('trad-input');
+  input.value = text;
+  document.getElementById('trad-clear-btn').classList.add('visible');
+  updateTradSpeakBtn();
+  translate();
+}
+
+function closeLiveCamera() {
+  liveRunning = false; liveSeq++;
+  if (liveStream) { liveStream.getTracks().forEach(t => t.stop()); liveStream = null; }
+  if (liveWorker) { try { liveWorker.terminate(); } catch (e) {} liveWorker = null; }
+  const v = document.getElementById('live-video');
+  if (v) { v.pause(); v.srcObject = null; }
+  document.getElementById('live-overlay').style.display = 'none';
 }
 
 async function translate() {
