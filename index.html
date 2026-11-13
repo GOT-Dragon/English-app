@@ -1077,6 +1077,19 @@ function loadData() {
     dictHistory = [];
   }
 }
+function backfillPhraseTranslations() {
+  // Remplit la traduction du mot (fr) des phrases qui l'ont perdue, a partir du dico
+  const map = {};
+  dicoData.forEach(e => { const k = (e.word || '').trim().toLowerCase(); if (e.trans && !map[k]) map[k] = e.trans; });
+  let n = 0;
+  phraseData.forEach(p => {
+    if (!p.fr || !p.fr.trim()) {
+      const t = map[(p.word || '').trim().toLowerCase()];
+      if (t) { p.fr = t; n++; }
+    }
+  });
+  return n;
+}
 function saveData() {
   try {
     localStorage.setItem(LS_DICO, JSON.stringify(dicoData));
@@ -1381,8 +1394,8 @@ function renderPhrases() {
         <button class="sound-btn reveal-sound-btn" onclick="event.stopPropagation();speak('${we}','en')" title="Écouter" style="flex-shrink:0;">🔊</button>
         <div class="phrase-actions" style="gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
           <button class="sound-btn" onclick="speak('${ee}','en')" title="Écouter">🔊</button>
-          ${e.custom ? `<button class="sound-btn" title="Corriger avec l'IA" onclick="correctPhraseInline(this,'${ee}')">🔧</button>` : ''}
-          ${e.custom ? `<button class="sound-btn" onclick="openEditPhrase(${globalIdx},'${we}','${ee}','${fe}')" title="Modifier">✏️</button>` : ''}
+          <button class="sound-btn" title="Corriger avec l'IA" onclick="correctPhraseInline(this,'${ee}')">🔧</button>
+          <button class="sound-btn" onclick="openEditPhrase(${globalIdx},'${we}','${ee}','${fe}')" title="Modifier">✏️</button>
         </div>
       </div>
       <div class="reveal-hint">appuyez pour révéler</div>
@@ -2252,6 +2265,7 @@ function saveEditItem() {
     phraseData[editIdx].word = w;
     phraseData[editIdx].en = en;
     phraseData[editIdx].fr = fr;
+    phraseData[editIdx].custom = true;
     delete phraseData[editIdx].frSentence; // la traduction de phrase en cache est obsolete, on la regenerera
     saveData(); syncToCloud(); renderPhrases();
     showToast('Phrase modifiée !');
@@ -3291,7 +3305,9 @@ async function syncFromCloud() {
     }
     if (row.dict_history) dictHistory = JSON.parse(row.dict_history);
     if (changed) {
+      const filled = backfillPhraseTranslations();
       saveData(); saveProData(); renderDico(); renderPhrases(); renderPro();
+      if (filled > 0) scheduleSyncToCloud();
       const customCount = dicoData.filter(e=>e.custom).length;
       showToast('Sync OK - ' + dicoData.length + ' mots (' + customCount + ' perso)');
     }
@@ -3664,6 +3680,7 @@ function enterApp() {
 // ═══════════════════════════════════════════
 loadSupabaseConfig();
 loadData();
+if (backfillPhraseTranslations() > 0) saveData();
 loadProData();
 // Reset search/filter state on every load
 dicoFilter = '';
