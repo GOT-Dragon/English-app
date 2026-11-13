@@ -1609,6 +1609,7 @@ function renderQ() {
         <div class="debrief-header">
           <span class="debrief-icon">${ok?'✓':'✗'}</span>
           <span class="debrief-word">${label}</span>
+          <button class="sound-btn" data-w="${r.item.word.replace(/"/g,'&quot;')}" onclick="event.stopPropagation();speak(this.dataset.w,'en')" title="Écouter">🔊</button>
           <span class="debrief-chosen">${ok?r.chosen:''+r.chosen+' → '+r.correct+''}</span>
         </div>
         <div class="debrief-answer" style="display:none;">${answerLine}</div>
@@ -1627,6 +1628,8 @@ function renderQ() {
   }
   qAnswered=false;
   const item=qItems[qIdx];
+  qSpeakWord = item.word;
+  qSpeakSentence = item.en || item.word;
 
   let q, correct, opts, subtitle='';
 
@@ -1660,7 +1663,7 @@ function renderQ() {
 
   box.innerHTML=`
     <div class="quiz-meta"><span>Q${qIdx+1}/${qItems.length}</span><span>Score : ${qScore}</span></div>
-    <div class="quiz-q">${q}</div>
+    <div class="quiz-q">${q}${qMode==='dico' ? ` <button class="sound-btn" onclick="speakQ('word')" title="Écouter" style="font-size:20px;vertical-align:middle;">🔊</button>` : ''}</div>
     ${subtitle}
     <div class="quiz-opts">${opts.map(o=>{
       const os=o.replace(/`/g,'\\`');
@@ -1668,9 +1671,12 @@ function renderQ() {
     }).join('')}</div>
     <div class="quiz-next-row" style="display:none;" id="quiz-next-row">
       <div class="quiz-score-text" id="quiz-fb"></div>
+      <button class="sound-btn" id="quiz-speak-btn" onclick="speakQ('${qMode==='phrase'?'sentence':'word'}')" title="Écouter" style="font-size:20px;${qMode==='dico'?'display:none;':''}">🔊</button>
       <button class="btn-primary" onclick="qIdx++;renderQ()">Suivant →</button>
     </div>`;
 }
+let qSpeakWord = '', qSpeakSentence = '';
+function speakQ(kind) { speak(kind === 'sentence' ? qSpeakSentence : qSpeakWord, 'en'); }
 function answerQ(btn,chosen,correct){
   if(qAnswered)return;
   qAnswered=true;
