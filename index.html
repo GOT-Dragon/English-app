@@ -2253,28 +2253,48 @@ function closeEditModal() {
   document.getElementById('edit-modal').classList.remove('open');
 }
 
+function wordKey(w) { return (w || '').trim().toLowerCase(); }
+
 function saveEditItem() {
   if (editMode === 'dico') {
     const w = document.getElementById('edit-word').value.trim();
     const t = document.getElementById('edit-trans').value.trim();
     if (!w || !t) { showToast('Remplissez les deux champs'); return; }
+    const oldKey = wordKey(dicoData[editIdx].word);
     dicoData[editIdx].word = w;
     dicoData[editIdx].trans = t;
     dicoData[editIdx].custom = true;
-    saveData(); scheduleSyncToCloud(); renderDico();
-    showToast('Mot modifié !');
+    // Report de la definition dans Pratique (meme mot)
+    const keys = [oldKey, wordKey(w)];
+    let synced = 0;
+    phraseData.forEach(p => {
+      if (keys.includes(wordKey(p.word)) && p.fr !== t) { p.fr = t; synced++; }
+    });
+    saveData(); syncToCloud(); renderDico();
+    if (synced > 0) renderPhrases();
+    showToast(synced > 0 ? 'Mot modifié — reporté dans Pratique' : 'Mot modifié !');
   } else {
     const w = document.getElementById('edit-word').value.trim();
     const en = document.getElementById('edit-en').value.trim();
     const fr = document.getElementById('edit-fr').value.trim();
     if (!w) { showToast('Le mot est obligatoire'); return; }
+    const oldKey = wordKey(phraseData[editIdx].word);
     phraseData[editIdx].word = w;
     phraseData[editIdx].en = en;
     phraseData[editIdx].fr = fr;
     phraseData[editIdx].custom = true;
     delete phraseData[editIdx].frSentence; // la traduction de phrase en cache est obsolete, on la regenerera
+    // Report de la definition dans Mon Dico (meme mot), seulement si elle n'est pas vide
+    const keys = [oldKey, wordKey(w)];
+    let synced = 0;
+    if (fr) {
+      dicoData.forEach(d => {
+        if (keys.includes(wordKey(d.word)) && d.trans !== fr) { d.trans = fr; d.custom = true; synced++; }
+      });
+    }
     saveData(); syncToCloud(); renderPhrases();
-    showToast('Phrase modifiée !');
+    if (synced > 0) renderDico();
+    showToast(synced > 0 ? 'Phrase modifiée — reportée dans Mon Dico' : 'Phrase modifiée !');
   }
   closeEditModal();
 }
