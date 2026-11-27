@@ -1,4 +1,4 @@
-const CACHE_NAME = 'english-app-v43';
+const CACHE_NAME = 'english-app-v44';
 const ASSETS = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
