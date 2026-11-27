@@ -1319,19 +1319,32 @@ function isValidFrSentence(s) {
   return !!s && !/NO QUERY SPECIFIED|INVALID|MYMEMORY|Traduction indisponible/i.test(s);
 }
 
+const FR_SENT_V = 2; // version du cache des traductions de phrases (augmenter pour forcer une regeneration)
+function hasGoodSentence(e) { return isValidFrSentence(e.frSentence) && e.frSentenceV === FR_SENT_V; }
+
+function regenPhraseSentence(btn) {
+  const card = btn.closest('.phrase-card');
+  if (!card) return;
+  const e = phraseData[parseInt(card.dataset.idx, 10)];
+  if (!e) return;
+  delete e.frSentence; delete e.frSentenceV;
+  loadPhraseSentenceTranslation(card);
+}
+
 async function loadPhraseSentenceTranslation(card) {
   const idx = parseInt(card.dataset.idx, 10);
   const e = phraseData[idx];
   if (!e) return;
   const slot = document.getElementById('pfr-sent-' + idx);
   if (!e.en || !e.en.trim()) { if (slot) slot.textContent = ''; return; } // pas de phrase a traduire
-  if (isValidFrSentence(e.frSentence)) return; // deja en cache
+  if (hasGoodSentence(e)) return; // deja en cache (version a jour)
   delete e.frSentence;
   if (slot) slot.textContent = 'Traduction de la phrase…';
   try {
     const translated = (await dialTranslate(e.en)).replace(/^🇫🇷\s*/, '');
     if (!isValidFrSentence(translated)) { if (slot) slot.textContent = ''; return; }
     e.frSentence = translated;
+    e.frSentenceV = FR_SENT_V;
     saveData();
     scheduleSyncToCloud();
     const stillThere = document.getElementById('pfr-sent-' + idx);
@@ -1394,13 +1407,14 @@ function renderPhrases() {
         <button class="sound-btn reveal-sound-btn" onclick="event.stopPropagation();speak('${we}','en')" title="Écouter" style="flex-shrink:0;">🔊</button>
         <div class="phrase-actions" style="gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">
           <button class="sound-btn" onclick="speak('${ee}','en')" title="Écouter">🔊</button>
+          <button class="sound-btn" title="Retraduire la phrase" onclick="regenPhraseSentence(this)">↻</button>
           <button class="sound-btn" title="Corriger avec l'IA" onclick="correctPhraseInline(this,'${ee}')">🔧</button>
           <button class="sound-btn" onclick="openEditPhrase(${globalIdx},'${we}','${ee}','${fe}')" title="Modifier">✏️</button>
         </div>
       </div>
       <div class="reveal-hint">appuyez pour révéler</div>
       <div class="phrase-en">${e.en}</div>
-      <div class="phrase-fr-sentence" id="pfr-sent-${globalIdx}">${isValidFrSentence(e.frSentence) ? e.frSentence : ''}</div>
+      <div class="phrase-fr-sentence" id="pfr-sent-${globalIdx}">${hasGoodSentence(e) ? e.frSentence : ''}</div>
       <div class="phrase-fr">${e.fr||'<em style="color:var(--text3)">Pas de traduction</em>'}</div>
       <div class="phrase-correct-result" style="display:none;margin-top:8px;"></div>
     </div>`;
@@ -2885,17 +2899,20 @@ async function dialTranslate(text) {
   try {
     const groqKey = localStorage.getItem('eng_groq_key') || '';
     if (groqKey) {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
-        body: JSON.stringify({ model: 'openai/gpt-oss-20b', reasoning_effort: 'low', max_tokens: 600,
-          messages: [{ role: 'user', content: `Translate this English sentence to French. Reply with ONLY the French translation, nothing else:
-"${text}"` }]
-        })
-      });
-      const d = await res.json();
-      const tr = d.choices?.[0]?.message?.content?.trim() || '';
-      if (tr) return '🇫🇷 ' + tr;
+      const prompt = `You are a professional English-to-French translator. Translate the text below into natural, correct French. Choose the right everyday meaning of every word in context and never confuse similar-looking words. Reply with ONLY the French translation, nothing else.\n\n"${text}"`;
+      for (const model of ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']) {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey },
+            body: JSON.stringify({ model, reasoning_effort: 'medium', max_tokens: 1200, messages: [{ role: 'user', content: prompt }] }),
+            signal: AbortSignal.timeout(20000)
+          });
+          const d = await res.json();
+          const tr = (d.choices?.[0]?.message?.content || '').trim().replace(/^"|"$/g, '');
+          if (tr) return '🇫🇷 ' + tr;
+        } catch (e) { /* modele suivant */ }
+      }
     }
     // Fallback
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|fr`;
